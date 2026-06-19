@@ -1,0 +1,11 @@
+esp32s3.menu.PartitionScheme.large_ota_7mb=16MB Flash (4MB App / 7MB SPIFFS)
+esp32s3.menu.PartitionScheme.large_ota_7mb.build.partitions=16M_ota_7mb_spiffs
+esp32s3.menu.PartitionScheme.large_ota_7mb.upload.maximum_size=4194304
+
+esp32s3.menu.PartitionScheme.minimal_16mb=16MB Flash (7.75MB App / 256KB SPIFFS)
+esp32s3.menu.PartitionScheme.minimal_16mb.build.partitions=16M_ota_minimal_spiffs
+esp32s3.menu.PartitionScheme.minimal_16mb.upload.maximum_size=8126464
+
+esp32s3.menu.PartitionScheme.large_ota_1mb=16MB Flash (7.37MB App / 1MB SPIFFS)
+esp32s3.menu.PartitionScheme.large_ota_1mb.build.partitions=16M_ota_1mb_spiffs
+esp32s3.menu.PartitionScheme.large_ota_1mb.upload.maximum_size=7733248
