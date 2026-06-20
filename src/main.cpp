@@ -13,11 +13,15 @@
  - Update to version 1.1 @ 14/6/2026
   - implement Usb Host Midi
   - change to esp32s3
+  - Update to version 1.2 @ 20/6/2026
+  - Refactor to use new cs::BluetoothMIDI_Interface wrapper for better BLE-MIDI handling and status tracking.
 */
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <SPIFFS.h>
+#include "LittleFS.h" // Use #include "SPIFFS.h" if using legacy SPIFFS
+// Fast Conversion Aliases
+#define SPIFFS LittleFS
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
@@ -29,9 +33,11 @@
 
 #include <AiEsp32RotaryEncoder.h>
 
-#include <MIDI.h>
-#include <BLEMIDI_Transport.h>
-#include <hardware/BLEMIDI_ESP32_NimBLE.h>
+//#include <MIDI.h>
+//#include <BLEMIDI_Transport.h>
+//#include <hardware/BLEMIDI_ESP32_NimBLE.h>
+//#include <Control_Surface.h>
+#include <MIDI_Interfaces/BluetoothMIDI_Interface.hpp>
 
 /* ------------- MIDI Value Ranges ------------- */
 #define SWITCH_CC_MIN 0
@@ -119,13 +125,13 @@ Esp32UsbHost usbHost;
 
 // Your custom connection callback function
 void onUsbMidiConnected() {
-  Serial.println("\n[MAIN SKETCH] >>> PocketMaster connected successfully! <<< \n");
+  Serial.println("\n[USB HOST] >>> PocketMaster connected successfully! <<< \n");
   usbMidiConnected = true;
 }
 
 // Your custom disconnection callback function
 void onUsbMidiDisconnected() {
-  Serial.println("\n[MAIN SKETCH] !!! PocketMaster disconnected !!! \n");
+  Serial.println("\n[USB HOST] !!! PocketMaster disconnected !!! \n");
   usbMidiConnected = false;
 }
 
@@ -145,11 +151,12 @@ void usbHostCoreTask(void *pvParameters) {
 /* ------------- BLE-MIDI -------------- */
 //BLEMIDI_CREATE_DEFAULT_INSTANCE();
 //MIDI_CREATE_INSTANCE(BLEMIDI, BLEMIDI, MIDI);
+cs::BluetoothMIDI_Interface midi_ble;
 
 #define MIDI_DEVICE_NAME "KRELFSW"  //name of BT Device
 const char* BLE_NAME = MIDI_DEVICE_NAME;
 
-BLEMIDI_CREATE_INSTANCE(MIDI_DEVICE_NAME, MIDI);
+//BLEMIDI_CREATE_INSTANCE(MIDI_DEVICE_NAME, MIDI);
 bool btConnected = false;
 bool lastBtConnected = false;
 char connectedDeviceAddress[18] = "Not Connected";
@@ -449,7 +456,7 @@ void setup() {
       WiFi.begin(wifiSsid, wifiPass);
     }
   }
-  
+ /*
   //BLEMIDI.begin(BLE_NAME);
   MIDI.begin(MIDI_CHANNEL_OMNI);
   
@@ -471,15 +478,22 @@ void setup() {
     Serial.println("BLE-MIDI disconnected");
     strlcpy(connectedDeviceAddress, "Not Connected", sizeof(connectedDeviceAddress));
   });
-  
+  */
   enableLoopWDT(); // Registers the main loop to the default watchdog thread
-  xTaskCreatePinnedToCore(midiTask, "ReadCB", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(midiTask, "BLEtask", 4096, NULL, 1, NULL, 1);
 
+
+//BLE-MIDI setup moved to after USB Host init in case of any conflicts. Also added connection callbacks for status bar updates.
+  midi_ble.setName(MIDI_DEVICE_NAME);
+  cs::MIDI_Interface::beginAll();
+   
   drawHome();
 }
 
 /* ============================= Loop =========================== */
 void loop() {
+ //BLE-MIDI connection status check for status bar updates
+  btConnected = midi_ble.isConnected();
   //rotary.loop();
   readBattery();
   
@@ -1098,7 +1112,7 @@ void drawStatusBar(){
   int bx = SCREEN_WIDTH - 16; // Battery icon at far right (14x8 body + 2x4 tip)
   int wifiX = bx - 10;        // WiFi icon (8px) with 2px padding
   int btX = wifiX - 10;       // BT icon (8px) with 2px padding
-  int usbX = btX - 10;       // USB status position
+  int usbX = btX - 12;       // USB status position
 
   // Bluetooth
   if (btConnected) {
@@ -1618,9 +1632,10 @@ void drawAbout(){
   display.setTextColor(WHITE);
   display.setCursor(2, 14);
   display.println("KHAIRIL MIDI SWITCH");
-  display.println("v1.1.2026");
+  display.println("v1.2.2026");
   display.print("Device: "); display.println(BLE_NAME);
-  display.print("Peer: "); display.println(connectedDeviceAddress);
+  display.print("Bt: "); display.println(connectedDeviceAddress);
+  display.print("Usb: "); display.println(usbMidiConnected ? "Connected" : "Not Connected");
   display.print("Batt: "); display.print(batteryPercent); display.println("%");
 
   display.display();
@@ -1932,9 +1947,10 @@ void sendCC(byte cc, byte val, byte ch) {
       // Send CC 10, Value 64 on Channel 1
       usbHost.sendMIDI_CC(cc, val, ch);
     } 
-    else {
-        // Fallback to BLE if USB is not connected
-        MIDI.sendControlChange(cc, val, ch);
+    else if (btConnected) {
+      // Fallback to BLE if USB is not connected
+      //MIDI.sendControlChange(cc, val, ch);
+      midi_ble.sendControlChange(cs::MIDIAddress(cc, cs::Channel(ch)), val);
     }
 }
 
@@ -1953,7 +1969,8 @@ void midiTask(void*){
   for(;;){
     // ESP32_Host_MIDI uses the ESP-IDF USB Host background task, 
     // so explicit polling is not required here.
-    MIDI.read();      
+    //MIDI.read();     
+    cs::MIDI_Interface::updateAll(); 
     vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
