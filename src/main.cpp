@@ -275,45 +275,45 @@ const uint8_t PROGMEM WIFI_DOT[8]  = {0x00,0x00,0x81,0x42,0x24,0x18,0x18,0x18};
 const uint8_t PROGMEM WIFI_LOW[8]  = {0x00,0x00,0x81,0x5a,0x24,0x18,0x18,0x18};
 const uint8_t PROGMEM WIFI_MED[8]  = {0x00,0x3c,0x81,0x5a,0x24,0x18,0x18,0x18};
 const uint8_t PROGMEM WIFI_HIGH[8] = {0x18,0x3c,0xdb,0x66,0x3c,0x18,0x18,0x18};
-const uint8_t PROGMEM ARROW_TL[8] = { // Top Left: points right and down
-  0b00000000,
-  0b00000001,
-  0b00000011,
-  0b00000110,
-  0b00001100,
-  0b00011000,
-  0b00110000,
-  0b01100000
-};
-const uint8_t PROGMEM ARROW_BL[8] = { // Bottom Left: points right and up
-  0b01100000,
-  0b00110000,
-  0b00011000,
-  0b00001100,
-  0b00000110,
-  0b00000011,
-  0b00000001,
+const uint8_t PROGMEM ARROW_TL[8] = { // Top Left: 
+  0b11111110,
+  0b11111100,
+  0b11111000,
+  0b11111100,
+  0b11111110,
+  0b11011100,
+  0b10001000,
   0b00000000
 };
-const uint8_t PROGMEM ARROW_TR[8] = { // Top Right: points left and down
+const uint8_t PROGMEM ARROW_BL[8] = { // Bottom Left:
   0b00000000,
-  0b10000000,
-  0b11000000,
-  0b01100000,
-  0b00110000,
-  0b00011000,
-  0b00001100,
-  0b00000110
+  0b10001000,
+  0b11011100,
+  0b11111110,
+  0b11111100,
+  0b11111000,
+  0b11111100,
+  0b11111110
 };
-const uint8_t PROGMEM ARROW_BR[8] = { // Bottom Right: points left and up
-  0b00000110,
-  0b00001100,
-  0b00011000,
-  0b00110000,
-  0b01100000,
-  0b11000000,
-  0b10000000,
+const uint8_t PROGMEM ARROW_TR[8] = { // Top Right: 
+  0b01111111,
+  0b00111111,
+  0b00011111,
+  0b00111111,
+  0b01111111,
+  0b00111011,
+  0b00010001,
   0b00000000
+};
+const uint8_t PROGMEM ARROW_BR[8] = { // Bottom Right: 
+  0b00000000,
+  0b00010001,
+  0b00111011,
+  0b01111111,
+  0b00111111,
+  0b00011111,
+  0b00111111,
+  0b01111111
 };
 const uint8_t PROGMEM USB_ICON[8]  = {0x10,0x54,0x38,0x10,0x10,0x10,0x38,0x00};
 
@@ -795,14 +795,21 @@ void loop() {
             WiFi.mode(WIFI_OFF);
           }
           drawWifiMenu();
-        } else if (wifiMenuIndex == 1) { // Info
+        } else if (wifiMenuIndex == 1) { // Connect/Disconnect
+          if (WiFi.status() == WL_CONNECTED) {
+            WiFi.disconnect();
+          } else if (wifiEnabled && strlen(wifiSsid) > 0) {
+            WiFi.begin(wifiSsid, wifiPass);
+          }
+          drawWifiMenu();
+        } else if (wifiMenuIndex == 2) { // Info
           screen = MENU_WIFI_INFO;
           drawWifiInfo();
-        } else if (wifiMenuIndex == 2) { // Edit SSID
+        } else if (wifiMenuIndex == 3) { // Edit SSID
           startKeyboard(wifiSsid, sizeof(wifiSsid));
-        } else if (wifiMenuIndex == 3) { // Edit Password
+        } else if (wifiMenuIndex == 4) { // Edit Password
           startKeyboard(wifiPass, sizeof(wifiPass));
-        } else if (wifiMenuIndex == 4) { // Scan for Networks
+        } else if (wifiMenuIndex == 5) { // Scan for Networks
           screen = MENU_WIFI_SCAN;
           display.clearDisplay();
           drawStatusBar();
@@ -813,7 +820,7 @@ void loop() {
           scanResultCount = WiFi.scanNetworks();
           wifiScanIndex = 0;
           drawWifiScan();
-        } else if (wifiMenuIndex == 5) { // Save
+        } else if (wifiMenuIndex == 6) { // Save
           saveSettings();
           if (wifiEnabled) {
             WiFi.disconnect(true);
@@ -821,7 +828,7 @@ void loop() {
             WiFi.begin(wifiSsid, wifiPass);
           }
           drawWifiMenu();
-        } else if (wifiMenuIndex == 6) { // Forget
+        } else if (wifiMenuIndex == 7) { // Forget
           wifiSsid[0] = '\0';
           wifiPass[0] = '\0';
           saveSettings();
@@ -829,17 +836,17 @@ void loop() {
             WiFi.disconnect(true);
           }
           drawWifiMenu();
-        } else if (wifiMenuIndex == 7) { // Back
+        } else if (wifiMenuIndex == 8) { // Back
           screen = MENU_MAIN;
           drawMainMenu();
         }
       } else if (screen == MENU_WIFI_SCAN) {
         if (scanResultCount > 0) {
-          const char* selectedSsid = WiFi.SSID(wifiScanIndex).c_str();
+          String selectedSsid = WiFi.SSID(wifiScanIndex);
 
           // If a new SSID is selected, update it and clear the old password.
-          if (strcmp(wifiSsid, selectedSsid) != 0) {
-            strncpy(wifiSsid, selectedSsid, sizeof(wifiSsid) - 1);
+          if (selectedSsid != wifiSsid) {
+            strncpy(wifiSsid, selectedSsid.c_str(), sizeof(wifiSsid) - 1);
             wifiSsid[sizeof(wifiSsid) - 1] = '\0';
             wifiPass[0] = '\0'; // Clear password for new SSID
           }
@@ -851,6 +858,7 @@ void loop() {
             WiFi.begin((const char*)wifiSsid, (const char*)""); // Connect with empty password
           }
         }
+        WiFi.scanDelete();
         screen = MENU_WIFI;
         drawWifiMenu();
       } else if (screen == KEYBOARD) {
@@ -1091,7 +1099,7 @@ void loop() {
       int dir = (v > lastEncMain) ? 1 : -1;
       lastEncMain = v;
       wifiMenuIndex += dir;
-      wifiMenuIndex = constrain(wifiMenuIndex, 0, 7); // Enable, Info, SSID, Pass, Scan, Save, Forget, Back
+      wifiMenuIndex = constrain(wifiMenuIndex, 0, 8); // Enable, Connect, Info, SSID, Pass, Scan, Save, Forget, Back
       
       const int visibleItems = 4;
       if (wifiMenuIndex < wifiMenuTop) {
@@ -1442,7 +1450,7 @@ void drawWifiMenu() {
   //  display.print("Disabled");
   //}
 
-  const char* labels[8] = {"Enable", "Info", "SSID", "Password", "Scan for Networks", "Save", "Forget", "Back"};
+  const char* labels[9] = {"Enable", (WiFi.status() == WL_CONNECTED ? "Disconnect" : "Connect"), "Info", "SSID", "Password", "Scan for Networks", "Save", "Forget", "Back"};
 
   const int visibleItems = 4;
   const int itemHeight = 11;
@@ -1450,7 +1458,7 @@ void drawWifiMenu() {
 
   for (int i = 0; i < visibleItems; i++) {
     int itemIndex = wifiMenuTop + i;
-    if (itemIndex > 7) break;
+    if (itemIndex > 8) break;
 
     int currentY = startY + i * itemHeight;
     bool highlight = (itemIndex == wifiMenuIndex);
@@ -1469,9 +1477,9 @@ void drawWifiMenu() {
     display.setCursor(70, currentY);
     if (itemIndex == 0) { // Enable
       display.print(wifiEnabled ? "ON" : "OFF");
-    } else if (itemIndex == 1) { // Info
+    } else if (itemIndex == 1 || itemIndex == 2) { // Connect/Disconnect or Info
       // No value, just a navigation item
-    } else if (itemIndex == 2) { // SSID
+    } else if (itemIndex == 3) { // SSID
       int max_len = (SCREEN_WIDTH - 75) / 6;
       int ssid_len = strlen(wifiSsid);
       if (ssid_len > max_len) {
@@ -1492,7 +1500,7 @@ void drawWifiMenu() {
       } else {
           display.print(wifiSsid);
       }
-    } else if (itemIndex == 3) { // Password
+    } else if (itemIndex == 4) { // Password
       //for(int j=0; j<strlen(wifiPass); j++) display.print('*');
       for(int j=0; j<8; j++) display.print('*');  
     }
@@ -1957,7 +1965,7 @@ void loadSettings(){
   if (!wifi_obj.isNull()) {
     wifiEnabled = wifi_obj["enabled"] | false;
     strlcpy(wifiSsid, wifi_obj["ssid"] | "", sizeof(wifiSsid));
-
+    strlcpy(wifiPass, wifi_obj["pass"] | "", sizeof(wifiPass));
   }
 }
 
