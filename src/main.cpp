@@ -262,6 +262,9 @@ uint32_t swLastChange[4] = {0,0,0,0};
 uint32_t lastBlinkTime = 0;
 bool btIconVisible = true;
 const uint32_t BLINK_INTERVAL_MS = 500;
+uint32_t lastIndicatorBlinkTime = 0;
+bool indicatorVisible = true;
+const uint32_t INDICATOR_BLINK_INTERVAL_MS = 750; // Slightly slower than status icon blink
 
 /* ------------- Bitmaps ----------------- */
 // 8x8 Bluetooth icons (filled vs outline)
@@ -272,6 +275,46 @@ const uint8_t PROGMEM WIFI_DOT[8]  = {0x00,0x00,0x81,0x42,0x24,0x18,0x18,0x18};
 const uint8_t PROGMEM WIFI_LOW[8]  = {0x00,0x00,0x81,0x5a,0x24,0x18,0x18,0x18};
 const uint8_t PROGMEM WIFI_MED[8]  = {0x00,0x3c,0x81,0x5a,0x24,0x18,0x18,0x18};
 const uint8_t PROGMEM WIFI_HIGH[8] = {0x18,0x3c,0xdb,0x66,0x3c,0x18,0x18,0x18};
+const uint8_t PROGMEM ARROW_TL[8] = { // Top Left: points right and down
+  0b00000000,
+  0b00000001,
+  0b00000011,
+  0b00000110,
+  0b00001100,
+  0b00011000,
+  0b00110000,
+  0b01100000
+};
+const uint8_t PROGMEM ARROW_BL[8] = { // Bottom Left: points right and up
+  0b01100000,
+  0b00110000,
+  0b00011000,
+  0b00001100,
+  0b00000110,
+  0b00000011,
+  0b00000001,
+  0b00000000
+};
+const uint8_t PROGMEM ARROW_TR[8] = { // Top Right: points left and down
+  0b00000000,
+  0b10000000,
+  0b11000000,
+  0b01100000,
+  0b00110000,
+  0b00011000,
+  0b00001100,
+  0b00000110
+};
+const uint8_t PROGMEM ARROW_BR[8] = { // Bottom Right: points left and up
+  0b00000110,
+  0b00001100,
+  0b00011000,
+  0b00110000,
+  0b01100000,
+  0b11000000,
+  0b10000000,
+  0b00000000
+};
 const uint8_t PROGMEM USB_ICON[8]  = {0x10,0x54,0x38,0x10,0x10,0x10,0x38,0x00};
 
 /* ------------- Spiff ----------------- */
@@ -514,9 +557,16 @@ void loop() {
 
   // Blinking state for BT icon
   bool needsRedrawForBlink = false;
-  if (millis() - lastBlinkTime > BLINK_INTERVAL_MS) {
+  if (millis() - lastBlinkTime > BLINK_INTERVAL_MS) { // Always update blink timer
     lastBlinkTime = millis();
     if (!btConnected) btIconVisible = !btIconVisible;
+    needsRedrawForBlink = true;
+  }
+
+  // Blinking state for Switch Indicators
+  if (millis() - lastIndicatorBlinkTime > INDICATOR_BLINK_INTERVAL_MS) {
+    lastIndicatorBlinkTime = millis();
+    indicatorVisible = !indicatorVisible;
     needsRedrawForBlink = true;
   }
 
@@ -1244,7 +1294,7 @@ void drawHome(){
   display.print(txt);
 
   // Draw blinking indicators for physical switches
-  if (lastPressedIndex >= 0) {
+  if (lastPressedIndex >= 0 && indicatorVisible) { // Only draw if an index is set and it's visible (blinking)
     const int sz = 8;     // Arrow size
     const int pad = 2;    // Padding from edge
     const int topY = 10;  // Top limit (below status bar)
@@ -1252,24 +1302,16 @@ void drawHome(){
     const int rightX = SCREEN_WIDTH - 1 - pad;
 
     if (lastPressedIndex == 0) { // Switch 1: Top Left
-      display.drawLine(pad, topY, pad + sz, topY, WHITE);
-      display.drawLine(pad, topY, pad, topY + sz, WHITE);
-      display.drawLine(pad, topY, pad + sz, topY + sz, WHITE);
+      display.drawBitmap(pad, topY, ARROW_TL, sz, sz, WHITE);
     } 
     else if (lastPressedIndex == 1) { // Switch 2: Bottom Left
-      display.drawLine(pad, botY, pad + sz, botY, WHITE);
-      display.drawLine(pad, botY, pad, botY - sz, WHITE);
-      display.drawLine(pad, botY, pad + sz, botY - sz, WHITE);
+      display.drawBitmap(pad, botY - sz, ARROW_BL, sz, sz, WHITE);
     } 
-    else if (lastPressedIndex == 3) { // Switch 3: Top Right
-      display.drawLine(rightX, topY, rightX - sz, topY, WHITE);
-      display.drawLine(rightX, topY, rightX, topY + sz, WHITE);
-      display.drawLine(rightX, topY, rightX - sz, topY + sz, WHITE);
+    else if (lastPressedIndex == 3) { // Switch 4: Top Right
+      display.drawBitmap(rightX - sz, topY, ARROW_TR, sz, sz, WHITE);
     } 
-    else if (lastPressedIndex == 2) { // Switch 4: Bottom Right
-      display.drawLine(rightX, botY, rightX - sz, botY, WHITE);
-      display.drawLine(rightX, botY, rightX, botY - sz, WHITE);
-      display.drawLine(rightX, botY, rightX - sz, botY - sz, WHITE);
+    else if (lastPressedIndex == 2) { // Switch 3: Bottom Right
+      display.drawBitmap(rightX - sz, botY - sz, ARROW_BR, sz, sz, WHITE);
     } 
     else if (lastPressedIndex == 4) { // Encoder Btn: Bottom Center
       // Blinking line at bottom center to avoid overlapping with the number box
