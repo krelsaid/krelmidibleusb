@@ -514,9 +514,9 @@ void loop() {
 
   // Blinking state for BT icon
   bool needsRedrawForBlink = false;
-  if (!btConnected && millis() - lastBlinkTime > BLINK_INTERVAL_MS) {
+  if (millis() - lastBlinkTime > BLINK_INTERVAL_MS) {
     lastBlinkTime = millis();
-    btIconVisible = !btIconVisible;
+    if (!btConnected) btIconVisible = !btIconVisible;
     needsRedrawForBlink = true;
   }
 
@@ -1242,6 +1242,42 @@ void drawHome(){
 
   display.setCursor(cx, cy);
   display.print(txt);
+
+  // Draw blinking indicators for physical switches
+  if (lastPressedIndex >= 0) {
+    const int sz = 8;     // Arrow size
+    const int pad = 2;    // Padding from edge
+    const int topY = 10;  // Top limit (below status bar)
+    const int botY = SCREEN_HEIGHT - 1;
+    const int rightX = SCREEN_WIDTH - 1 - pad;
+
+    if (lastPressedIndex == 0) { // Switch 1: Top Left
+      display.drawLine(pad, topY, pad + sz, topY, WHITE);
+      display.drawLine(pad, topY, pad, topY + sz, WHITE);
+      display.drawLine(pad, topY, pad + sz, topY + sz, WHITE);
+    } 
+    else if (lastPressedIndex == 1) { // Switch 2: Bottom Left
+      display.drawLine(pad, botY, pad + sz, botY, WHITE);
+      display.drawLine(pad, botY, pad, botY - sz, WHITE);
+      display.drawLine(pad, botY, pad + sz, botY - sz, WHITE);
+    } 
+    else if (lastPressedIndex == 3) { // Switch 3: Top Right
+      display.drawLine(rightX, topY, rightX - sz, topY, WHITE);
+      display.drawLine(rightX, topY, rightX, topY + sz, WHITE);
+      display.drawLine(rightX, topY, rightX - sz, topY + sz, WHITE);
+    } 
+    else if (lastPressedIndex == 2) { // Switch 4: Bottom Right
+      display.drawLine(rightX, botY, rightX - sz, botY, WHITE);
+      display.drawLine(rightX, botY, rightX, botY - sz, WHITE);
+      display.drawLine(rightX, botY, rightX - sz, botY - sz, WHITE);
+    } 
+    else if (lastPressedIndex == 4) { // Encoder Btn: Bottom Center
+      // Blinking line at bottom center to avoid overlapping with the number box
+      int lineW = 20;
+      display.drawFastHLine((SCREEN_WIDTH - lineW) / 2, botY, lineW, WHITE);
+    }
+  }
+
   display.display();
 }
 
