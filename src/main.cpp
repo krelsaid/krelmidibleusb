@@ -15,6 +15,7 @@
   - change to esp32s3
   - Update to version 1.2 @ 20/6/2026
   - Refactor to use new cs::BluetoothMIDI_Interface wrapper for better BLE-MIDI handling and status tracking.
+  - Encoder Switch Arrow Indicator
 */
 
 #include <Arduino.h>
@@ -38,7 +39,6 @@
 //#include <hardware/BLEMIDI_ESP32_NimBLE.h>
 //#include <Control_Surface.h>
 #include <MIDI_Interfaces/BluetoothMIDI_Interface.hpp>
-
 /* ------------- MIDI Value Ranges ------------- */
 #define SWITCH_CC_MIN 0
 #define SWITCH_CC_MAX 127
@@ -112,6 +112,14 @@ void IRAM_ATTR rotaryISR(){
 /* ------------- Battery ---------------- */
 #define R1 100000.0f
 #define R2 100000.0f
+// --- Battery Calibration ---
+// If the displayed percentage is wrong, first adjust BATTERY_V_MIN and BATTERY_V_MAX
+// to match your battery's specifications.
+// If it's still incorrect, you can use BATTERY_CALIBRATION_FACTOR for fine-tuning.
+// For example, if the display shows 3.6V when it should be 4.2V, the factor would be 4.2 / 3.6 = 1.167
+const float BATTERY_V_MAX = 4.2f; // Voltage of a fully charged battery (e.g., 4.2V for Li-Ion)
+const float BATTERY_V_MIN = 3.0f; // Voltage of a fully discharged battery (e.g., 3.0V for Li-Ion)
+const float BATTERY_CALIBRATION_FACTOR = 1.105f; // Adjust if the measured voltage is consistently off
 float batteryVoltage = 0.f;
 int   batteryPercent = 0;
 uint32_t lastBatteryRead = 0;
@@ -123,13 +131,11 @@ bool batteryBufferFilled = false;
 bool usbMidiConnected = false;
 Esp32UsbHost usbHost;
 
-// Your custom connection callback function
 void onUsbMidiConnected() {
   Serial.println("\n[USB HOST] >>> PocketMaster connected successfully! <<< \n");
   usbMidiConnected = true;
 }
 
-// Your custom disconnection callback function
 void onUsbMidiDisconnected() {
   Serial.println("\n[USB HOST] !!! PocketMaster disconnected !!! \n");
   usbMidiConnected = false;
@@ -147,6 +153,7 @@ void usbHostCoreTask(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(1)); 
   }
 }
+
 
 /* ------------- BLE-MIDI -------------- */
 //BLEMIDI_CREATE_DEFAULT_INSTANCE();
@@ -242,6 +249,11 @@ bool editingValue = false;
 int confirmResetSelection = 0; // 0=NO, 1=YES
 
 int lastPressedIndex = -1;  // -1 none → show "00"
+
+int lastEncoderRotated = -1; // -1 for none, 0-4 for which encoder
+int lastEncoderDirection = 0; // -1 for left, 1 for right
+uint32_t lastEncoderActivityTime = 0;
+const uint32_t ENCODER_DISPLAY_TIMEOUT_MS = 1500; // 1.5 seconds
 
 /* ------------- Menu Timeout ------------- */
 const uint32_t MENU_TIMEOUT_MS = 15000; // 15 seconds
@@ -529,7 +541,6 @@ void setup() {
 //BLE-MIDI setup moved to after USB Host init in case of any conflicts. Also added connection callbacks for status bar updates.
   midi_ble.setName(MIDI_DEVICE_NAME);
   cs::MIDI_Interface::beginAll();
-   
   drawHome();
 }
 
@@ -688,7 +699,13 @@ void loop() {
         }
       } else if (screen == MENU_SWITCH_SELECT) {
         if (switchSelectMenuIndex <= 4) { // Switch 1-4 or Encoder Btn
-          switchEditIndex = switchSelectMenuIndex;
+          // Map menu index to the actual config index
+          if (switchSelectMenuIndex == 0) switchEditIndex = 0;      // Switch 1 -> config[0]
+          else if (switchSelectMenuIndex == 1) switchEditIndex = 1; // Switch 2 -> config[1]
+          else if (switchSelectMenuIndex == 2) switchEditIndex = 4; // Switch 3 (UI) -> config[4]
+          else if (switchSelectMenuIndex == 3) switchEditIndex = 2; // Switch 4 -> config[2]
+          else if (switchSelectMenuIndex == 4) switchEditIndex = 3; // Switch 5 -> config[3]
+
           switchMenuIndex = 0;
           switchMenuTop = 0;
           editingValue = false;
@@ -730,7 +747,13 @@ void loop() {
         }
       } else if (screen == MENU_ENCODER_SELECT) {
         if (encoderSelectMenuIndex <= 4) { // Encoder 1-5
-          encoderEditIndex = encoderSelectMenuIndex;
+          // Map menu index to the actual config index
+          if (encoderSelectMenuIndex == 0) encoderEditIndex = 1;      // Encoder 1 -> config[1]
+          else if (encoderSelectMenuIndex == 1) encoderEditIndex = 2; // Encoder 2 -> config[2]
+          else if (encoderSelectMenuIndex == 2) encoderEditIndex = 0; // Encoder 3 (UI) -> config[0]
+          else if (encoderSelectMenuIndex == 3) encoderEditIndex = 3; // Encoder 4 -> config[3]
+          else if (encoderSelectMenuIndex == 4) encoderEditIndex = 4; // Encoder 5 -> config[4]
+
           encoderMenuItemIndex = 0;
           switchMenuTop = 0; // reuse for encoder edit menu scroll
           editingValue = false;
@@ -795,21 +818,14 @@ void loop() {
             WiFi.mode(WIFI_OFF);
           }
           drawWifiMenu();
-        } else if (wifiMenuIndex == 1) { // Connect/Disconnect
-          if (WiFi.status() == WL_CONNECTED) {
-            WiFi.disconnect();
-          } else if (wifiEnabled && strlen(wifiSsid) > 0) {
-            WiFi.begin(wifiSsid, wifiPass);
-          }
-          drawWifiMenu();
-        } else if (wifiMenuIndex == 2) { // Info
+        } else if (wifiMenuIndex == 1) { // Info
           screen = MENU_WIFI_INFO;
           drawWifiInfo();
-        } else if (wifiMenuIndex == 3) { // Edit SSID
+        } else if (wifiMenuIndex == 2) { // Edit SSID
           startKeyboard(wifiSsid, sizeof(wifiSsid));
-        } else if (wifiMenuIndex == 4) { // Edit Password
+        } else if (wifiMenuIndex == 3) { // Edit Password
           startKeyboard(wifiPass, sizeof(wifiPass));
-        } else if (wifiMenuIndex == 5) { // Scan for Networks
+        } else if (wifiMenuIndex == 4) { // Scan for Networks
           screen = MENU_WIFI_SCAN;
           display.clearDisplay();
           drawStatusBar();
@@ -820,7 +836,7 @@ void loop() {
           scanResultCount = WiFi.scanNetworks();
           wifiScanIndex = 0;
           drawWifiScan();
-        } else if (wifiMenuIndex == 6) { // Save
+        } else if (wifiMenuIndex == 5) { // Save
           saveSettings();
           if (wifiEnabled) {
             WiFi.disconnect(true);
@@ -828,7 +844,7 @@ void loop() {
             WiFi.begin(wifiSsid, wifiPass);
           }
           drawWifiMenu();
-        } else if (wifiMenuIndex == 7) { // Forget
+        } else if (wifiMenuIndex == 6) { // Forget
           wifiSsid[0] = '\0';
           wifiPass[0] = '\0';
           saveSettings();
@@ -836,7 +852,7 @@ void loop() {
             WiFi.disconnect(true);
           }
           drawWifiMenu();
-        } else if (wifiMenuIndex == 8) { // Back
+        } else if (wifiMenuIndex == 7) { // Back
           screen = MENU_MAIN;
           drawMainMenu();
         }
@@ -926,27 +942,48 @@ void loop() {
 
   // --- MIDI Encoder Handling (only on HOME screen) ---
   if (screen == HOME) {
+    // Timeout for encoder display
+    if (lastEncoderDirection != 0 && millis() - lastEncoderActivityTime > ENCODER_DISPLAY_TIMEOUT_MS) {
+        lastEncoderDirection = 0;
+        lastEncoderRotated = -1;
+        drawHome();
+    }
+
     for (int i = 0; i < 5; i++) {
       long value = midiEncoders[i]->readEncoder();
       if (value != 0) { // A change has occurred
         EncoderSettings &cfg = encoderSettings[i];
+        lastEncoderRotated = i;
+        lastEncoderActivityTime = millis();
+
         if (cfg.mode == ENCODER_MODE_SINGLE) {
           encoderAccumulatedSteps[i] += value;
-        if (encoderAccumulatedSteps[i] >= cfg.singleModeSteps) {
-          // Rotated right enough
-          sendCC(cfg.right.cc, cfg.right.val, cfg.right.ch);
-          encoderAccumulatedSteps[i] = 0;
-        } else if (encoderAccumulatedSteps[i] <= -cfg.singleModeSteps) {
-          // Rotated left enough
-          sendCC(cfg.left.cc, cfg.left.val, cfg.left.ch);
-          encoderAccumulatedSteps[i] = 0;
+          if (encoderAccumulatedSteps[i] >= cfg.singleModeSteps) {
+            // Rotated right enough
+            sendCC(cfg.right.cc, cfg.right.val, cfg.right.ch);
+            encoderAccumulatedSteps[i] = 0;
+            lastEncoderDirection = 1; // Right
+          } else if (encoderAccumulatedSteps[i] <= -cfg.singleModeSteps) {
+            // Rotated left enough
+            sendCC(cfg.left.cc, cfg.left.val, cfg.left.ch);
+            encoderAccumulatedSteps[i] = 0;
+            lastEncoderDirection = -1; // Left
+          } else {
+            // Not enough steps yet, don't update display
+            lastEncoderDirection = 0;
           }
         } else if (cfg.mode == ENCODER_MODE_RANGE) { // ENCODER_MODE_RANGE
+          if (value > 0) lastEncoderDirection = 1;
+          else lastEncoderDirection = -1;
+
           cfg.currentValue += value; // value is the change from the encoder
           cfg.currentValue = constrain(cfg.currentValue, cfg.rangeMin, cfg.rangeMax);
           sendCC(cfg.left.cc, cfg.currentValue, cfg.left.ch);
         }
         midiEncoders[i]->setEncoderValue(0); // Reset for next relative read
+        if (lastEncoderDirection != 0) {
+            drawHome(); // Redraw home screen to show arrow
+        }
       }
     }
   }
@@ -1099,7 +1136,7 @@ void loop() {
       int dir = (v > lastEncMain) ? 1 : -1;
       lastEncMain = v;
       wifiMenuIndex += dir;
-      wifiMenuIndex = constrain(wifiMenuIndex, 0, 8); // Enable, Connect, Info, SSID, Pass, Scan, Save, Forget, Back
+      wifiMenuIndex = constrain(wifiMenuIndex, 0, 7); // Enable, Info, SSID, Pass, Scan, Save, Forget, Back
       
       const int visibleItems = 4;
       if (wifiMenuIndex < wifiMenuTop) {
@@ -1183,7 +1220,6 @@ void drawStatusBar(){
   if (usbMidiConnected) {
     display.drawBitmap(usbX, 0, USB_ICON, 8, 8, WHITE);
   }
-
   // WiFi
   if (wifiEnabled) {
     const uint8_t* wifiIcon = WIFI_DOT;
@@ -1269,39 +1305,101 @@ void drawHome(){
   display.clearDisplay();
   drawStatusBar();
   
+  // --- 1. Always prepare the default big number (from last pressed switch) ---
   display.setTextSize(6);
-
-  char txt[4] = "00";
+  char bigNumStr[4] = "00";
   bool isInverted = false;
-
   if (lastPressedIndex >= 0) {
     SwitchConfig &cfg = switchConfigs[lastPressedIndex];
     int ch = cfg.ch;
     ch = constrain(ch, 0, 99);
-    snprintf(txt, sizeof(txt), "%02d", ch);
-
+    snprintf(bigNumStr, sizeof(bigNumStr), "%02d", ch);
     if (cfg.mode == SWITCH_MODE_TOGGLE && cfg.state) {
       isInverted = true;
     }
   }
 
-  int16_t x1,y1; uint16_t w,h;
-  display.getTextBounds(txt, 0, 0, &x1, &y1, &w, &h);
-  int cx = (SCREEN_WIDTH - w)/2;
-  int cy = ((SCREEN_HEIGHT - h)/2) + 6;  // below status bar
+  // Get dimensions of the big number
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(bigNumStr, 0, 0, &x1, &y1, &w, &h);
+  int bigNumY = ((SCREEN_HEIGHT - h) / 2) + 6; // Center vertically below status bar
 
-  if (isInverted) {
-    const int padding = 4;
-    display.fillRect(cx - padding, cy - padding, w + (padding - 2), h + (padding - 2), WHITE);
-    display.setTextColor(BLACK);
-  } else {
+  // --- 2. Check for encoder activity and draw arrow if needed ---
+  if (lastEncoderDirection != 0 && lastEncoderRotated != -1) {
+    // --- Encoder Activity is active ---
+    EncoderSettings &enc_cfg = encoderSettings[lastEncoderRotated];
+    int encoderChannel = 0;
+
+    // Determine the channel from the active encoder
+    if (enc_cfg.mode == ENCODER_MODE_RANGE) {
+        encoderChannel = enc_cfg.left.ch;
+    } else { // ENCODER_MODE_SINGLE
+        if (lastEncoderDirection == 1) { // Right
+            encoderChannel = enc_cfg.right.ch;
+        } else { // Left
+            encoderChannel = enc_cfg.left.ch;
+        }
+    }
+
+    // Calculate positions for [Arrow] [Big Number] or [Big Number] [Arrow]
+    int arrowSize = 15;
+    int arrowY = bigNumY + h / 2 - arrowSize / 2;
+    int arrowX;
+    int bigNumX;
+    const int spacing = 10;
+
+    if (lastEncoderDirection == 1) { // Right: [ BigNum ] [ > ]
+        bigNumX = (SCREEN_WIDTH - w - arrowSize - spacing) / 2;
+        arrowX = bigNumX + w + (spacing-6);
+        // Draw right-pointing triangle
+        display.fillTriangle(arrowX, arrowY, arrowX, arrowY + arrowSize, arrowX + arrowSize, arrowY + arrowSize / 2, WHITE);
+    } else { // Left: [ < ] [ BigNum ]
+        arrowX = (SCREEN_WIDTH - w - arrowSize - spacing) / 2;
+        bigNumX = arrowX + arrowSize + spacing;
+        // Draw left-pointing triangle
+        display.fillTriangle(arrowX, arrowY + arrowSize / 2, arrowX + arrowSize, arrowY, arrowX + arrowSize, arrowY + arrowSize, WHITE);
+    }
+
+    // Draw small channel number above arrow
+    display.setTextSize(1);
     display.setTextColor(WHITE);
+    char chanStr[3];
+    snprintf(chanStr, sizeof(chanStr), "%d", encoderChannel);
+    int16_t x_ch, y_ch;
+    uint16_t w_ch, h_ch;
+    display.getTextBounds(chanStr, 0, 0, &x_ch, &y_ch, &w_ch, &h_ch);
+    display.setCursor(arrowX + (arrowSize / 2) - (w_ch / 2), arrowY - h_ch - 2);
+    display.print(chanStr);
+
+    // --- 3. Draw the big number (positioned beside the arrow) ---
+    display.setTextSize(6);
+    if (isInverted) {
+      const int padding = 4;
+      display.fillRect(bigNumX - padding, bigNumY - padding, w + (padding - 2), h + (padding - 2), WHITE);
+      display.setTextColor(BLACK);
+    } else {
+      display.setTextColor(WHITE);
+    }
+    display.setCursor(bigNumX, bigNumY);
+    display.print(bigNumStr);
+
+  } else {
+    // --- No encoder activity, draw default centered big number ---
+    int cx = (SCREEN_WIDTH - w)/2;
+    int cy = bigNumY;
+    if (isInverted) {
+      const int padding = 4;
+      display.fillRect(cx - padding, cy - padding, w + (padding - 2), h + (padding - 2), WHITE);
+      display.setTextColor(BLACK);
+    } else {
+      display.setTextColor(WHITE);
+    }
+    display.setCursor(cx, cy);
+    display.print(bigNumStr);
   }
-
-  display.setCursor(cx, cy);
-  display.print(txt);
-
-  // Draw blinking indicators for physical switches
+ 
+   // Draw blinking indicators for physical switches
   if (lastPressedIndex >= 0 && indicatorVisible) { // Only draw if an index is set and it's visible (blinking)
     const int sz = 8;     // Arrow size
     const int pad = 2;    // Padding from edge
@@ -1327,7 +1425,6 @@ void drawHome(){
       display.drawFastHLine((SCREEN_WIDTH - lineW) / 2, botY, lineW, WHITE);
     }
   }
-
   display.display();
 }
 
@@ -1340,14 +1437,14 @@ void drawMainMenu(){
 
 void drawSwitchSelectMenu() {
   const char* items[] = {
-    "Switch 1", "Switch 2", "Switch 3", "Switch 4", "Encoder Btn", "Back"
+    "Switch 1", "Switch 2", "Switch 3 (UI)", "Switch 4", "Switch 5", "Back"
   };
   drawMenuList("Select Switch", items, 6, switchSelectMenuIndex, switchSelectMenuTop);
 }
 
 void drawEncoderSelectMenu() {
   const char* items[] = {
-    "Encoder 3 (UI)", "Encoder 1", "Encoder 2", "Encoder 4", "Encoder 5", "Back"
+    "Encoder 1", "Encoder 2", "Encoder 3 (UI)", "Encoder 4", "Encoder 5", "Back"
   };
   drawMenuList("Select Encoder", items, 6, encoderSelectMenuIndex, encoderSelectMenuTop);
 }
@@ -1359,7 +1456,9 @@ void drawEncoderEditMenu() {
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(2, 10);
-  display.print("Encoder "); display.print(encoderEditIndex + 1); display.print(" Config");
+  const char* encoderNames[] = {"Encoder 3 (UI)", "Encoder 1", "Encoder 2", "Encoder 4", "Encoder 5"};
+  display.print(encoderNames[encoderEditIndex]);
+  display.print(" Config");
 
   EncoderSettings &cfg = encoderSettings[encoderEditIndex];
   const char** labels;
@@ -1450,7 +1549,7 @@ void drawWifiMenu() {
   //  display.print("Disabled");
   //}
 
-  const char* labels[9] = {"Enable", (WiFi.status() == WL_CONNECTED ? "Disconnect" : "Connect"), "Info", "SSID", "Password", "Scan for Networks", "Save", "Forget", "Back"};
+  const char* labels[8] = {"Enable", "Info", "SSID", "Password", "Scan for Networks", "Save", "Forget", "Back"};
 
   const int visibleItems = 4;
   const int itemHeight = 11;
@@ -1458,7 +1557,7 @@ void drawWifiMenu() {
 
   for (int i = 0; i < visibleItems; i++) {
     int itemIndex = wifiMenuTop + i;
-    if (itemIndex > 8) break;
+    if (itemIndex > 7) break;
 
     int currentY = startY + i * itemHeight;
     bool highlight = (itemIndex == wifiMenuIndex);
@@ -1477,9 +1576,9 @@ void drawWifiMenu() {
     display.setCursor(70, currentY);
     if (itemIndex == 0) { // Enable
       display.print(wifiEnabled ? "ON" : "OFF");
-    } else if (itemIndex == 1 || itemIndex == 2) { // Connect/Disconnect or Info
+    } else if (itemIndex == 1) { // Info
       // No value, just a navigation item
-    } else if (itemIndex == 3) { // SSID
+    } else if (itemIndex == 2) { // SSID
       int max_len = (SCREEN_WIDTH - 75) / 6;
       int ssid_len = strlen(wifiSsid);
       if (ssid_len > max_len) {
@@ -1500,7 +1599,7 @@ void drawWifiMenu() {
       } else {
           display.print(wifiSsid);
       }
-    } else if (itemIndex == 4) { // Password
+    } else if (itemIndex == 3) { // Password
       //for(int j=0; j<strlen(wifiPass); j++) display.print('*');
       for(int j=0; j<8; j++) display.print('*');  
     }
@@ -1648,11 +1747,8 @@ void drawSwitchMenu(){
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(2, 10);
-  if (switchEditIndex <= 3) {
-    display.print("Switch "); display.print(switchEditIndex + 1);
-  } else {
-    display.print("Encoder Button");
-  }
+  const char* switchNames[] = {"Switch 1", "Switch 2", "Switch 4", "Switch 5", "Switch 3 (UI)"};
+  display.print(switchNames[switchEditIndex]);
 
   SwitchConfig &cfg = switchConfigs[switchEditIndex];
 
@@ -1722,8 +1818,8 @@ void drawAbout(){
   display.print("Device: "); display.println(BLE_NAME);
   display.print("Bt: "); display.println(connectedDeviceAddress);
   display.print("Usb: "); display.println(usbMidiConnected ? "Connected" : "Not Connected");
-  display.print("Batt: "); display.print(batteryPercent); display.println("%");
-
+  display.print("Batt: "); display.print(batteryPercent); display.print("% (");
+  display.print(batteryVoltage, 2); display.println("V)");
   display.display();
 }
 
@@ -1853,7 +1949,7 @@ void readBattery(){
 
   // Perform a single raw reading
   float vAdc = analogRead(BATTERY_PIN) * (3.3f / 4095.0f);
-  float currentVoltage = vAdc * ((R1 + R2) / R2);  // Apply voltage divider formula
+  float currentVoltage = vAdc * ((R1 + R2) / R2) * BATTERY_CALIBRATION_FACTOR;  // Apply voltage divider and calibration
 
   // Store the reading in a circular buffer for smoothing
   batteryReadings[batteryReadingIndex] = currentVoltage;
@@ -1876,10 +1972,15 @@ void readBattery(){
   // A simple heuristic for charging detection: if voltage is very near max, assume it's on a charger.
   // This is not perfect but a common way without a dedicated charging status pin.
   // A Li-ion charger holds the voltage at ~4.2V.
-  const float CHARGING_THRESHOLD_V = 4.18f; 
+  const float CHARGING_THRESHOLD_V = BATTERY_V_MAX - 0.02f;
   isCharging = (batteryVoltage > CHARGING_THRESHOLD_V);
   
-  int pct = map((int)(batteryVoltage * 100), 300, 420, 0, 100); // Map 3.00V-4.20V to 0-100%
+  // map() works with integers, so we multiply by 100 to preserve precision.
+  int v_max_int = (int)(BATTERY_V_MAX * 100);
+  int v_min_int = (int)(BATTERY_V_MIN * 100);
+  int v_current_int = (int)(batteryVoltage * 100);
+
+  int pct = map(v_current_int, v_min_int, v_max_int, 0, 100);
   batteryPercent = constrain(pct, 0, 100);
 }
 
@@ -1968,7 +2069,6 @@ void loadSettings(){
     strlcpy(wifiPass, wifi_obj["pass"] | "", sizeof(wifiPass));
   }
 }
-
 
 void saveSettings(){
   JsonDocument doc;
