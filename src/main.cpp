@@ -23,10 +23,11 @@
 #include "LittleFS.h" // Use #include "SPIFFS.h" if using legacy SPIFFS
 // Fast Conversion Aliases
 #define SPIFFS LittleFS
-#include <WiFi.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
 #include "Esp32UsbHost.h"
+#include "WebServer.h" 
+#include "main.h" // Include main.h for global variables and structs
 
 #include <Adafruit_GFX.h>
 //#include <Adafruit_SH110X.h>
@@ -156,14 +157,11 @@ void usbHostCoreTask(void *pvParameters) {
 
 
 /* ------------- BLE-MIDI -------------- */
-//BLEMIDI_CREATE_DEFAULT_INSTANCE();
-//MIDI_CREATE_INSTANCE(BLEMIDI, BLEMIDI, MIDI);
 cs::BluetoothMIDI_Interface midi_ble;
 
 #define MIDI_DEVICE_NAME "KRELFSW"  //name of BT Device
 const char* BLE_NAME = MIDI_DEVICE_NAME;
 
-//BLEMIDI_CREATE_INSTANCE(MIDI_DEVICE_NAME, MIDI);
 bool btConnected = false;
 bool lastBtConnected = false;
 char connectedDeviceAddress[18] = "Not Connected";
@@ -171,48 +169,19 @@ bool isCharging = false;
 bool lastIsCharging = false;
 
 /* ------------- Encoder MIDI Config ------------- */
-enum EncoderMode { ENCODER_MODE_SINGLE, ENCODER_MODE_RANGE };
-
-struct EncoderMidiAction {
-    int cc = 20;
-    int val = 127;
-    int ch = 1;
-};
-
-struct EncoderSettings {
-    EncoderMode mode = ENCODER_MODE_SINGLE;
-    EncoderMidiAction left;
-    EncoderMidiAction right; // In Range mode, only left's cc/ch are used
-    int rangeMin = 0;
-    int rangeMax = 127;
-    int currentValue = 64;
-    int singleModeSteps = 1; // Steps needed for single CC send
-    int acceleration = 250; // Time in ms for acceleration (lower is faster), 0 is off.
-};
-
-EncoderSettings encoderSettings[5];
+// EncoderSettings defined in main.h
 int encoderAccumulatedSteps[5] = {0, 0, 0, 0, 0}; // For single mode step counting
 
 /* ------------- Switch MIDI Config ------------- */
-enum SwitchMode { SWITCH_MODE_MOMENTARY, SWITCH_MODE_TOGGLE };
+// SwitchConfig defined in main.h
 
-struct SwitchConfig {
-    SwitchMode mode = SWITCH_MODE_MOMENTARY;
-    int cc = 10;
-    int val = 127;
-    int ch = 1;
-    int altVal = 0;
-    bool state = false; // for toggle mode
-};
-SwitchConfig switchConfigs[5]; // 0..3 = Switch1..4, 4 = Encoder Button
-
-enum Screen { HOME, MENU_MAIN, MENU_SWITCH_SELECT, MENU_SWITCH, MENU_ENCODER_SELECT, MENU_ENCODER_EDIT, MENU_WIFI, MENU_WIFI_SCAN, MENU_WIFI_INFO, KEYBOARD, ABOUT, MENU_CONFIRM_RESET };
-Screen screen = HOME;
+// enum Screen { HOME, MENU_MAIN, MENU_SWITCH_SELECT, MENU_SWITCH, MENU_ENCODER_SELECT, MENU_ENCODER_EDIT, MENU_WIFI, MENU_WIFI_SCAN, MENU_WIFI_INFO, KEYBOARD, ABOUT, MENU_CONFIRM_RESET };
+Screen screen = HOME; 
 
 /* ------------- WiFi ----------------- */ 
 bool wifiEnabled = false;
-char wifiSsid[33] = "";
-char wifiPass[65] = "";
+char wifiSsid[33] = ""; 
+char wifiPass[65] = ""; 
 uint8_t wifiStatus = WL_IDLE_STATUS;
 int scanResultCount = 0;
 int wifiScanIndex = 0;
@@ -505,12 +474,20 @@ void setup() {
   }
     
   if (wifiEnabled) {
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(WIFI_AP_STA); // Enable both AP and STA modes
     WiFi.setHostname(BLE_NAME);
+    // Check if a saved SSID exists, otherwise create an AP
     if (strlen(wifiSsid) > 0) {
       WiFi.begin(wifiSsid, wifiPass);
+    } else {
+      // No saved WiFi, create an Access Point for configuration
+      WiFi.softAP(BLE_NAME, "12345678"); // SSID, password
+      Serial.print("AP IP address: ");
+      Serial.println(WiFi.softAPIP());
     }
   }
+
+  setupWebServer(); // Initialize web server
  /*
   //BLEMIDI.begin(BLE_NAME);
   MIDI.begin(MIDI_CHANNEL_OMNI);
@@ -553,18 +530,22 @@ void loop() {
   
   // OTA Handling
   if (wifiEnabled) {
-    if (WiFi.status() == WL_CONNECTED) {
+    // In AP+STA mode, OTA can run even if STA is not connected, if an AP client is connected
+    if (WiFi.status() == WL_CONNECTED || WiFi.softAPgetStationNum() > 0) {
       if (!otaRunning) {
         startOTA();
         otaRunning = true;
       }
       ArduinoOTA.handle();
     } else {
-      otaRunning = false; // handles case where connection is lost
+      otaRunning = false; // handles case where connection is lost or no AP clients
     }
   } else {
     otaRunning = false; // handles case where wifi is manually disabled
   }
+
+  // Handle web server client requests
+  server.handleClient();
 
   // Blinking state for BT icon
   bool needsRedrawForBlink = false;
