@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>KREL MIDI Controller</title>
+    <title>KHAIRIL MIDI Controller</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background-color: #f4f6f7; }
@@ -41,9 +41,9 @@
                 <select id="switchSelect" onchange="switchChanged()">
                     <option value="0">Switch 1</option>
                     <option value="1">Switch 2</option>
-                    <option value="2">Switch 3 (Menu)</option>
-                    <option value="3">Switch 4</option>
-                    <option value="4">Switch 5</option>
+                    <option value="4">Switch 3 (Menu)</option>
+                    <option value="2">Switch 4</option>
+                    <option value="3">Switch 5</option>
                 </select>
                 <label for="switchMode">Mode:</label>
                 <select id="switchMode" onchange="updateSwitchVisibility()">
@@ -62,9 +62,9 @@
             <div class="section">
                 <h3>Encoder Settings</h3>
                 <select id="encoderSelect" onchange="encoderChanged()">
-                    <option value="0">Encoder 1</option>
-                    <option value="1">Encoder 2</option>
-                    <option value="2">Encoder 3 (Menu)</option>
+                    <option value="1">Encoder 1</option>
+                    <option value="2">Encoder 2</option>
+                    <option value="0">Encoder 3 (Menu)</option>
                     <option value="3">Encoder 4</option>
                     <option value="4">Encoder 5</option>
                 </select>
@@ -127,6 +127,7 @@
             <h2>System Status</h2>
             <p>Firmware: <span id="sysFirmware">Loading...</span></p>
             <p>Battery: <span id="sysBattery">Loading...</span></p>
+            <p>Voltage: <span id="sysBatteryVolt">Loading...</span></p>
             <p>Uptime: <span id="sysUptime">Loading...</span></p>
         </div>
     </div>
@@ -154,6 +155,7 @@
         function applySettingsToPage() {
             document.getElementById('wifiEnable').checked = currentSettings.wifi.enabled;
             document.getElementById('ssid').value = currentSettings.wifi.ssid;
+            document.getElementById('password').value = currentSettings.wifi.password;
             loadSwitchSettings();
             loadEncoderSettings();
         }
@@ -260,6 +262,7 @@
                 const info = await response.json();
                 document.getElementById('sysFirmware').innerText = info.firmware || 'N/A';
                 document.getElementById('sysBattery').innerText = (info.battery !== undefined) ? `${info.battery}%` : 'N/A';
+                document.getElementById('sysBatteryVolt').innerText = (info.batteryVoltage !== undefined) ? `${info.batteryVoltage} V` : 'N/A';
                 document.getElementById('sysUptime').innerText = info.uptime || 'N/A';
             } catch (e) { console.error("Failed to fetch system info", e); }
         }

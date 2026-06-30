@@ -41,7 +41,7 @@
 //#include <Control_Surface.h>
 #include <MIDI_Interfaces/BluetoothMIDI_Interface.hpp>
 
-#define FW_VERSION "v1.2.2026"
+#define FW_VERSION "v1.3.2026"
 /* ------------- MIDI Value Ranges ------------- */
 #define SWITCH_CC_MIN 0
 #define SWITCH_CC_MAX 127
@@ -2113,13 +2113,15 @@ void saveSettings(){
   }
   f.close();
 
-  display.fillRect(10, 22, SCREEN_WIDTH-20, 20, BLACK);
-  display.drawRect(10, 22, SCREEN_WIDTH-20, 20, WHITE);
-  display.setTextColor(WHITE);
-  display.setCursor(40, 30);
-  display.print("Saved!");
-  display.display();
-  delay(1000);
+  if(editingValue){// Show a "Saved!" message on the display for 1 second,only if we were editing a value (not when saving from the menu)
+    display.fillRect(10, 22, SCREEN_WIDTH-20, 20, BLACK);
+    display.drawRect(10, 22, SCREEN_WIDTH-20, 20, WHITE);
+    display.setTextColor(WHITE);
+    display.setCursor(40, 30);
+    display.print("Saved!");
+    display.display();
+    delay(1000);
+  }
 }
 
 /* ============================ MIDI =========================== */
