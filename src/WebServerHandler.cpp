@@ -1,4 +1,4 @@
-#include "WebServer.h"
+#include "WebServerHandler.h"
 #include "main.h" // For access to switchConfigs, encoderSettings, wifiSsid, wifiPass, wifiEnabled, saveSettings
 
 WebServer server(80);
@@ -9,12 +9,20 @@ void setupWebServer() {
     server.on("/", HTTP_GET, handleRoot);
     server.on("/settings", HTTP_GET, handleSettings);
     server.on("/updateSettings", HTTP_POST, handleUpdateSettings);
+    server.on("/updateSwitch", HTTP_POST, handleUpdateSwitch);
+    server.on("/updateEncoder", HTTP_POST, handleUpdateEncoder);
     server.on("/scanWifi", HTTP_GET, handleScanWifi);
     server.on("/connectWifi", HTTP_POST, handleConnectWifi);
     server.on("/disconnectWifi", HTTP_POST, handleDisconnectWifi);
+    server.on("/systemInfo", HTTP_GET, handleSystemInfo);
+    server.on("/listFs", HTTP_GET, handleListFs);
+    server.on("/deleteFile", HTTP_DELETE, handleDeleteFile);
+    server.on("/upload", HTTP_POST, [](){ server.send(200); }, handleUpload);
+    server.on("/download", HTTP_GET, handleDownload);
     server.onNotFound(handleNotFound);
     server.begin();
     Serial.println("HTTP server started");
+    serverRunning = true;
 }
 
 String getContentType(String filename) {
@@ -157,6 +165,53 @@ void handleUpdateSettings() {
     }
 }
 
+void handleUpdateSwitch() {
+    if (server.hasArg("plain")) {
+        JsonDocument doc;
+        deserializeJson(doc, server.arg("plain"));
+        int index = doc["index"];
+        JsonObject obj = doc["config"];
+        if (index >= 0 && index < 5) {
+            switchConfigs[index].mode = strcmp(obj["mode"] | "momentary", "toggle") == 0 ? SWITCH_MODE_TOGGLE : SWITCH_MODE_MOMENTARY;
+            switchConfigs[index].cc = obj["cc"] | switchConfigs[index].cc;
+            switchConfigs[index].val = obj["val"] | switchConfigs[index].val;
+            switchConfigs[index].ch = obj["ch"] | switchConfigs[index].ch;
+            switchConfigs[index].altVal = obj["altVal"] | switchConfigs[index].altVal;
+            saveSettings();
+            server.send(200, "text/plain", "Switch saved");
+            return;
+        }
+    }
+    server.send(400, "text/plain", "Invalid Request");
+}
+
+void handleUpdateEncoder() {
+    if (server.hasArg("plain")) {
+        JsonDocument doc;
+        deserializeJson(doc, server.arg("plain"));
+        int index = doc["index"];
+        JsonObject obj = doc["config"];
+        if (index >= 0 && index < 5) {
+            encoderSettings[index].mode = strcmp(obj["mode"] | "single", "range") == 0 ? ENCODER_MODE_RANGE : ENCODER_MODE_SINGLE;
+            encoderSettings[index].left.cc = obj["left_cc"] | encoderSettings[index].left.cc;
+            encoderSettings[index].left.val = obj["left_val"] | encoderSettings[index].left.val;
+            encoderSettings[index].left.ch = obj["left_ch"] | encoderSettings[index].left.ch;
+            encoderSettings[index].right.cc = obj["right_cc"] | encoderSettings[index].right.cc;
+            encoderSettings[index].right.val = obj["right_val"] | encoderSettings[index].right.val;
+            encoderSettings[index].right.ch = obj["right_ch"] | encoderSettings[index].right.ch;
+            encoderSettings[index].rangeMin = obj["rangeMin"] | encoderSettings[index].rangeMin;
+            encoderSettings[index].rangeMax = obj["rangeMax"] | encoderSettings[index].rangeMax;
+            encoderSettings[index].currentValue = obj["currentValue"] | encoderSettings[index].currentValue;
+            encoderSettings[index].singleModeSteps = obj["singleModeSteps"] | encoderSettings[index].singleModeSteps;
+            encoderSettings[index].acceleration = obj["acceleration"] | encoderSettings[index].acceleration;
+            saveSettings();
+            server.send(200, "text/plain", "Encoder saved");
+            return;
+        }
+    }
+    server.send(400, "text/plain", "Invalid Request");
+}
+
 void handleScanWifi() {
     JsonDocument doc;
     JsonArray networks = doc.to<JsonArray>();
@@ -201,4 +256,73 @@ void handleDisconnectWifi() {
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
     server.send(200, "text/plain", "Disconnected from WiFi");
+}
+
+void handleSystemInfo() {
+    JsonDocument doc;
+    doc["firmware"] = fwVersion;
+    doc["battery"] = batteryPercent; 
+    doc["batteryVoltage"] = batteryVoltage;
+    doc["uptime"] = (long)(millis() / 1000);
+    String jsonResponse;
+    serializeJson(doc, jsonResponse);
+    server.send(200, "application/json", jsonResponse);
+}
+
+void handleListFs() {
+    JsonDocument doc;
+    JsonArray files = doc.to<JsonArray>();
+    File root = LittleFS.open("/", "r");
+    File file = root.openNextFile();
+    while (file) {
+        JsonObject obj = files.add<JsonObject>();
+        obj["name"] = file.name();
+        obj["size"] = file.size();
+        file = root.openNextFile();
+    }
+    String json;
+    serializeJson(doc, json);
+    server.send(200, "application/json", json);
+}
+
+void handleDeleteFile() {
+    if (server.hasArg("name")) {
+        LittleFS.remove(server.arg("name"));
+        server.send(200, "text/plain", "Deleted");
+    } else server.send(400, "text/plain", "Missing name");
+}
+
+void handleUpload() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+        String filename = upload.filename;
+        if (!filename.startsWith("/")) filename = "/" + filename;
+        File file = LittleFS.open(filename, "w");
+        file.close();
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+        String filename = upload.filename;
+        if (!filename.startsWith("/")) filename = "/" + filename;
+        File file = LittleFS.open(filename, "a");
+        file.write(upload.buf, upload.currentSize);
+        file.close();
+    }
+}
+
+void handleDownload() {
+    if (server.hasArg("name")) {
+        String path = server.arg("name");
+        if (!path.startsWith("/")) path = "/" + path;
+        
+        File file = LittleFS.open(path, "r");
+        if (!file || file.isDirectory()) {
+            server.send(404, "text/plain", "FileNotFound");
+            return;
+        }
+
+        server.setContentLength(file.size());
+        server.streamFile(file, "application/octet-stream");
+        file.close();
+    } else {
+        server.send(400, "text/plain", "Missing name");
+    }
 }

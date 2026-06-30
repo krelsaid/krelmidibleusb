@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KREL MIDI Controller</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background-color: #f4f6f7; }
+        .nav { background: #34495e; color: #fff; padding: 10px; display: flex; gap: 10px; }
+        .nav button { background: none; border: none; color: #bdc3c7; padding: 10px; cursor: pointer; }
+        .nav button.active { color: #fff; border-bottom: 2px solid #3498db; }
+        .tab-content { display: none; padding: 20px; }
+        .tab-content.active { display: block; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-radius: 8px; }
+        .section { margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 5px; background-color: #f9f9f9; }
+        h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #34495e; }
+        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #bdc3c7; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #3498db; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; transition: background 0.3s; }
+        button:hover { background-color: #2980b9; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        .modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; border-radius: 8px; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <button class="active" onclick="showTab('control')">Control</button>
+        <button onclick="showTab('system')">System</button>
+        <button onclick="showTab('files')">Filesystem</button>
+        <button onclick="openModal('aboutModal')">About</button>
+    </div>
+
+    <div class="container">
+        <div id="control" class="tab-content active">
+            <h2>Control Settings</h2>
+            <div class="section">
+                <h3>Switch Settings</h3>
+                <p><small>Only the fields relevant to the selected mode will be saved.</small></p>
+                <select id="switchSelect" onchange="switchChanged()">
+                    <option value="0">Switch 1</option>
+                    <option value="1">Switch 2</option>
+                    <option value="2">Switch 3 (Menu)</option>
+                    <option value="3">Switch 4</option>
+                    <option value="4">Switch 5</option>
+                </select>
+                <label for="switchMode">Mode:</label>
+                <select id="switchMode" onchange="updateSwitchVisibility()">
+                    <option value="momentary">Momentary</option>
+                    <option value="toggle">Toggle</option>
+                </select>
+                <div id="switchSettingCommon">
+                    <label>CC Number:</label><input type="number" id="switchCc">
+                    <label>Channel:</label><input type="number" id="switchChannel">
+                </div>
+                <div id="switchSettingMomentary"><label>Value:</label><input type="number" id="switchValue"></div>
+                <div id="switchSettingToggle"><label>On Value:</label><input type="number" id="switchValueToggleOn"><label>Off Value:</label><input type="number" id="switchAltValue"></div>
+                <button onclick="saveSwitchSettings()">Save Switch</button>
+            </div>
+
+            <div class="section">
+                <h3>Encoder Settings</h3>
+                <select id="encoderSelect" onchange="encoderChanged()">
+                    <option value="0">Encoder 1</option>
+                    <option value="1">Encoder 2</option>
+                    <option value="2">Encoder 3 (Menu)</option>
+                    <option value="3">Encoder 4</option>
+                    <option value="4">Encoder 5</option>
+                </select>
+                <label for="encoderMode">Mode:</label>
+                <select id="encoderMode" onchange="updateEncoderVisibility()">
+                    <option value="single">Single CC</option>
+                    <option value="range">Range CC</option>
+                </select>
+                <div id="encoderSingleSettings">
+                    <h3>Left Action</h3>
+                    <label>CC:</label><input type="number" id="encoderLeftCc">
+                    <label>Value:</label><input type="number" id="encoderLeftVal">
+                    <label>Ch:</label><input type="number" id="encoderLeftCh">
+                    <h3>Right Action</h3>
+                    <label>CC:</label><input type="number" id="encoderRightCc">
+                    <label>Value:</label><input type="number" id="encoderRightVal">
+                    <label>Ch:</label><input type="number" id="encoderRightCh">
+                </div>
+                <div id="encoderRangeSettings">
+                    <h3>Range Mode</h3>
+                    <label>Min:</label><input type="number" id="encoderRangeMin">
+                    <label>Max:</label><input type="number" id="encoderRangeMax">
+                    <label>Current:</label><input type="number" id="encoderCurrentValue" readonly>
+                </div>
+                <h3>General</h3>
+                <label>Steps:</label><input type="number" id="encoderSingleModeSteps">
+                <label>Accel:</label><input type="number" id="encoderAcceleration">
+                <button onclick="saveEncoderSettings()">Save Encoder</button>
+            </div>
+        </div>
+
+        <div id="system" class="tab-content">
+            <h2>System & WiFi</h2>
+            <div class="section">
+                <h3>WiFi Settings</h3>
+                <label>Enable:<input type="checkbox" id="wifiEnable"></label>
+                <label>SSID:</label><input type="text" id="ssid">
+                <label>Pass:</label><input type="password" id="password">
+                <button onclick="connectWifi()">Connect</button>
+            </div>
+            <button onclick="saveAllSettings()">Save All Changes</button>
+        </div>
+
+        <div id="files" class="tab-content">
+            <h2>File Explorer</h2>
+            <table>
+                <thead><tr><th>File</th><th>Size</th><th>Actions</th></tr></thead>
+                <tbody id="fileList"></tbody>
+            </table>
+            <h3>Upload File</h3>
+            <input type="file" id="fileInput">
+            <button onclick="uploadFile()">Upload Selected</button>
+            <p id="uploadStatus"></p>
+        </div>
+    </div>
+
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('aboutModal')">&times;</span>
+            <h2>System Status</h2>
+            <p>Firmware: <span id="sysFirmware">Loading...</span></p>
+            <p>Battery: <span id="sysBattery">Loading...</span></p>
+            <p>Uptime: <span id="sysUptime">Loading...</span></p>
+        </div>
+    </div>
+
+    <script>
+        let currentSettings = {};
+
+        function showTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.target.classList.add('active');
+            if(id === 'files') fetchFiles();
+        }
+        function openModal(id) { document.getElementById(id).style.display = 'block'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        
+        async function fetchSettings() {
+            const response = await fetch('/settings');
+            currentSettings = await response.json();
+            applySettingsToPage();
+            console.log("Settings", currentSettings);
+        }
+
+        function applySettingsToPage() {
+            document.getElementById('wifiEnable').checked = currentSettings.wifi.enabled;
+            document.getElementById('ssid').value = currentSettings.wifi.ssid;
+            loadSwitchSettings();
+            loadEncoderSettings();
+        }
+
+        function loadSwitchSettings() {
+            const index = document.getElementById('switchSelect').value;
+            const setting = currentSettings.switchConfigs[index];
+            if (setting) {
+                document.getElementById('switchMode').value = setting.mode;
+                document.getElementById('switchCc').value = setting.cc;
+                if (setting.mode === 'momentary') {
+                    document.getElementById('switchValue').value = setting.val;
+                } else {
+                    document.getElementById('switchValueToggleOn').value = setting.val;
+                    document.getElementById('switchAltValue').value = setting.altVal;
+                }
+                document.getElementById('switchChannel').value = setting.ch;
+                updateSwitchVisibility();
+            }
+        }
+
+        function loadEncoderSettings() {
+            const index = document.getElementById('encoderSelect').value;
+            const setting = currentSettings.encoderSettings[index];
+            if (setting) {
+                document.getElementById('encoderMode').value = setting.mode;
+                document.getElementById('encoderLeftCc').value = setting.left_cc;
+                document.getElementById('encoderLeftVal').value = setting.left_val;
+                document.getElementById('encoderLeftCh').value = setting.left_ch;
+                document.getElementById('encoderRightCc').value = setting.right_cc;
+                document.getElementById('encoderRightVal').value = setting.right_val;
+                document.getElementById('encoderRightCh').value = setting.right_ch;
+                document.getElementById('encoderRangeMin').value = setting.rangeMin;
+                document.getElementById('encoderRangeMax').value = setting.rangeMax;
+                document.getElementById('encoderCurrentValue').value = setting.currentValue;
+                document.getElementById('encoderSingleModeSteps').value = setting.singleModeSteps;
+                document.getElementById('encoderAcceleration').value = setting.acceleration;
+                updateEncoderVisibility();
+            }
+        }
+        
+        async function saveSwitchSettings() {
+            saveCurrentSwitchToLocal();
+            const index = document.getElementById('switchSelect').value;
+            const setting = currentSettings.switchConfigs[index];
+            const payload = { index: parseInt(index), config: setting };
+            const response = await fetch('/updateSwitch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            alert(await response.text());
+        }
+
+        async function saveEncoderSettings() {
+            saveCurrentEncoderToLocal();
+            const index = document.getElementById('encoderSelect').value;
+            const setting = currentSettings.encoderSettings[index];
+            const payload = { index: parseInt(index), config: setting };
+            const response = await fetch('/updateEncoder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            alert(await response.text());
+        }
+
+        async function fetchFiles() {
+            const resp = await fetch('/listFs');
+            const files = await resp.json();
+            const list = document.getElementById('fileList');
+            list.innerHTML = files.map(f => `<tr><td>${f.name}</td><td>${f.size} bytes</td><td><button onclick="downloadFile('${f.name}')">Download</button> <button onclick="deleteFile('${f.name}')">Delete</button></td></tr>`).join('');
+        }
+
+        async function deleteFile(name) {
+            if(confirm('Delete ' + name + '?')) {
+                await fetch('/deleteFile?name=' + name, { method: 'DELETE' });
+                fetchFiles();
+            }
+        }
+
+        function downloadFile(name) {
+            window.location.href = '/download?name=' + name;
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const status = document.getElementById('uploadStatus');
+            if (!file) { status.innerText = 'Please select a file.'; return; }
+            status.innerText = 'Uploading...';
+            const formData = new FormData();
+            formData.append('data', file);
+            try {
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                if (response.ok) { status.innerText = 'Upload successful!'; fetchFiles(); }
+                else status.innerText = 'Upload failed.';
+            } catch (e) { status.innerText = 'Upload failed: ' + e.message; }
+        }
+
+        async function fetchSystemInfo() {
+            try {
+                const response = await fetch('/systemInfo');
+                const info = await response.json();
+                document.getElementById('sysFirmware').innerText = info.firmware || 'N/A';
+                document.getElementById('sysBattery').innerText = (info.battery !== undefined) ? `${info.battery}%` : 'N/A';
+                document.getElementById('sysUptime').innerText = info.uptime || 'N/A';
+            } catch (e) { console.error("Failed to fetch system info", e); }
+        }
+
+        function updateSwitchVisibility() {
+            const mode = document.getElementById('switchMode').value;
+            document.getElementById('switchSettingMomentary').style.display = (mode === 'momentary') ? 'block' : 'none';
+            document.getElementById('switchSettingToggle').style.display = (mode === 'toggle') ? 'block' : 'none';
+        }
+        function updateEncoderVisibility() {
+            const mode = document.getElementById('encoderMode').value;
+            document.getElementById('encoderSingleSettings').style.display = (mode === 'single') ? 'block' : 'none';
+            document.getElementById('encoderRangeSettings').style.display = (mode === 'range') ? 'block' : 'none';
+        }
+        function switchChanged() {
+            saveCurrentSwitchToLocal();
+            loadSwitchSettings();
+        }
+        function encoderChanged() {
+            saveCurrentEncoderToLocal();
+            loadEncoderSettings();
+        }
+        function saveCurrentSwitchToLocal(index = null) {
+            const idx = index !== null ? index : (document.getElementById('switchSelect').dataset.lastIndex || 0);
+            const setting = currentSettings.switchConfigs[idx];
+            if (!setting) return;
+            const mode = document.getElementById('switchMode').value;
+            setting.mode = mode;
+            setting.cc = parseInt(document.getElementById('switchCc').value) || 0;
+            setting.ch = parseInt(document.getElementById('switchChannel').value) || 1;
+            if (mode === 'momentary') {
+                setting.val = parseInt(document.getElementById('switchValue').value) || 0;
+                setting.altVal = 0;
+            } else if (mode === 'toggle') {
+                setting.val = parseInt(document.getElementById('switchValueToggleOn').value) || 0;
+                setting.altVal = parseInt(document.getElementById('switchAltValue').value) || 0;
+            }
+            document.getElementById('switchSelect').dataset.lastIndex = document.getElementById('switchSelect').value;
+        }
+        function saveCurrentEncoderToLocal(index = null) {
+            const idx = index !== null ? index : (document.getElementById('encoderSelect').dataset.lastIndex || 0);
+            const setting = currentSettings.encoderSettings[idx];
+            if (!setting) return;
+            const mode = document.getElementById('encoderMode').value;
+            setting.mode = mode;
+            if (mode === 'single') {
+                setting.left_cc = parseInt(document.getElementById('encoderLeftCc').value) || 0;
+                setting.left_val = parseInt(document.getElementById('encoderLeftVal').value) || 0;
+                setting.left_ch = parseInt(document.getElementById('encoderLeftCh').value) || 1;
+                setting.right_cc = parseInt(document.getElementById('encoderRightCc').value) || 0;
+                setting.right_val = parseInt(document.getElementById('encoderRightVal').value) || 0;
+                setting.right_ch = parseInt(document.getElementById('encoderRightCh').value) || 1;
+            } else if (mode === 'range') {
+                setting.rangeMin = parseInt(document.getElementById('encoderRangeMin').value) || 0;
+                setting.rangeMax = parseInt(document.getElementById('encoderRangeMax').value) || 127;
+                setting.currentValue = parseInt(document.getElementById('encoderCurrentValue').value) || 0;
+            }
+            setting.singleModeSteps = parseInt(document.getElementById('encoderSingleModeSteps').value) || 1;
+            setting.acceleration = parseInt(document.getElementById('encoderAcceleration').value) || 0;
+            document.getElementById('encoderSelect').dataset.lastIndex = document.getElementById('encoderSelect').value;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchSettings();
+            fetchSystemInfo();
+        });
+    </script>
+</body>
+</html>

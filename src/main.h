@@ -43,6 +43,11 @@ extern char wifiSsid[33];
 extern char wifiPass[65];
 extern bool wifiEnabled;
 extern Screen screen;
+extern bool serverRunning;
+extern int batteryPercent;
+extern float batteryVoltage;
+extern char fwVersion[10];
+
 
 void saveSettings(); // Declare saveSettings as extern as well
 

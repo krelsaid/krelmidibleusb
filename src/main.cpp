@@ -26,7 +26,7 @@
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
 #include "Esp32UsbHost.h"
-#include "WebServer.h" 
+#include "WebServerHandler.h"
 #include "main.h" // Include main.h for global variables and structs
 
 #include <Adafruit_GFX.h>
@@ -40,6 +40,8 @@
 //#include <hardware/BLEMIDI_ESP32_NimBLE.h>
 //#include <Control_Surface.h>
 #include <MIDI_Interfaces/BluetoothMIDI_Interface.hpp>
+
+#define FW_VERSION "v1.2.2026"
 /* ------------- MIDI Value Ranges ------------- */
 #define SWITCH_CC_MIN 0
 #define SWITCH_CC_MAX 127
@@ -110,6 +112,7 @@ void IRAM_ATTR rotaryISR(){
   }
 }
 
+char fwVersion[10] = FW_VERSION; // Store firmware version as a string
 /* ------------- Battery ---------------- */
 #define R1 100000.0f
 #define R2 100000.0f
@@ -170,6 +173,8 @@ bool lastIsCharging = false;
 
 /* ------------- Encoder MIDI Config ------------- */
 // EncoderSettings defined in main.h
+SwitchConfig switchConfigs[5];
+EncoderSettings encoderSettings[5];
 int encoderAccumulatedSteps[5] = {0, 0, 0, 0, 0}; // For single mode step counting
 
 /* ------------- Switch MIDI Config ------------- */
@@ -189,6 +194,7 @@ int wifiMenuIndex = 0;
 int wifiMenuTop = 0;
 bool otaRunning = false;
 
+bool serverRunning = false; // Track if the web server is running
 /* ------------- Keyboard -------------- */
 enum KeyboardMode { K_LOWER, K_UPPER, K_NUM, K_SYM };
 KeyboardMode kbdMode = K_LOWER;
@@ -403,7 +409,7 @@ int wrapValue(int value, int dir, int minVal, int maxVal) {
 /* ============================ Setup ============================ */
 void setup() {
   Serial.begin(115200);
-  delay(50);
+  delay(500);
 
   WiFi.mode(WIFI_OFF);
 
@@ -487,7 +493,7 @@ void setup() {
     }
   }
 
-  setupWebServer(); // Initialize web server
+  //setupWebServer(); // Initialize web server
  /*
   //BLEMIDI.begin(BLE_NAME);
   MIDI.begin(MIDI_CHANNEL_OMNI);
@@ -537,15 +543,25 @@ void loop() {
         otaRunning = true;
       }
       ArduinoOTA.handle();
+
+      if(serverRunning) {
+        server.handleClient();
+      }else {
+        setupWebServer(); // Initialize web server
+      }
+
     } else {
       otaRunning = false; // handles case where connection is lost or no AP clients
+      serverRunning = false;
     }
+
   } else {
     otaRunning = false; // handles case where wifi is manually disabled
+    serverRunning = false;
   }
 
   // Handle web server client requests
-  server.handleClient();
+  //server.handleClient();
 
   // Blinking state for BT icon
   bool needsRedrawForBlink = false;
@@ -1795,7 +1811,7 @@ void drawAbout(){
   display.setTextColor(WHITE);
   display.setCursor(2, 14);
   display.println("KHAIRIL MIDI SWITCH");
-  display.println("v1.2.2026");
+  display.println(FW_VERSION);
   display.print("Device: "); display.println(BLE_NAME);
   display.print("Bt: "); display.println(connectedDeviceAddress);
   display.print("Usb: "); display.println(usbMidiConnected ? "Connected" : "Not Connected");
