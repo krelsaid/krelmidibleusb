@@ -32,6 +32,7 @@ struct SwitchConfig {
     int ch = 1;
     int altVal = 0;
     bool state = false; // for toggle mode
+    bool latchEnabled = true;
 };
 
 enum Screen { HOME, MENU_MAIN, MENU_SWITCH_SELECT, MENU_SWITCH, MENU_ENCODER_SELECT, MENU_ENCODER_EDIT, MENU_WIFI, MENU_WIFI_SCAN, MENU_WIFI_INFO, KEYBOARD, ABOUT, MENU_CONFIRM_RESET };

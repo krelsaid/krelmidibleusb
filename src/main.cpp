@@ -106,6 +106,11 @@ AiEsp32RotaryEncoder encoder4(ENC4_DT, ENC4_CLK, -1, -1, 4);
 AiEsp32RotaryEncoder encoder5(ENC5_DT, ENC5_CLK, -1, -1, 4);
 AiEsp32RotaryEncoder* midiEncoders[5] = {&rotary, &encoder2, &encoder3, &encoder4, &encoder5};
 
+template <typename T, size_t N>
+size_t arraySize(T (&)[N]) {
+    return N;
+}
+
 void IRAM_ATTR rotaryISR(){ 
   for (int i=0; i<5; i++) {
     midiEncoders[i]->readEncoder_ISR();
@@ -179,6 +184,8 @@ int encoderAccumulatedSteps[5] = {0, 0, 0, 0, 0}; // For single mode step counti
 
 /* ------------- Switch MIDI Config ------------- */
 // SwitchConfig defined in main.h
+const char* labels_mom[] = {"Mode", "CC", "Value", "Channel", "Back", "Save", "Exit"};
+const char* labels_tgl[] = {"Mode", "CC", "Value", "Alt Value", "Latch", "Channel", "Back", "Save", "Exit"};
 
 // enum Screen { HOME, MENU_MAIN, MENU_SWITCH_SELECT, MENU_SWITCH, MENU_ENCODER_SELECT, MENU_ENCODER_EDIT, MENU_WIFI, MENU_WIFI_SCAN, MENU_WIFI_INFO, KEYBOARD, ABOUT, MENU_CONFIRM_RESET };
 Screen screen = HOME; 
@@ -220,7 +227,7 @@ int encoderMenuItemIndex = 0; // which parameter in the encoder menu
 int mainMenuTop = 0;        // for scrolling in main menu
 int switchMenuTop = 0;      // for scrolling in switch menu
 bool editingValue = false;
-
+bool saveStatus = false; // true if settings were changed and need saving
 int confirmResetSelection = 0; // 0=NO, 1=YES
 
 int lastPressedIndex = -1;  // -1 none → show "00"
@@ -661,7 +668,7 @@ void loop() {
         drawWifiMenu();
       } else if (screen == MENU_SWITCH) {
         SwitchConfig &cfg = switchConfigs[switchEditIndex];
-        int numItems = (cfg.mode == SWITCH_MODE_TOGGLE) ? 8 : 7;
+        int numItems = (cfg.mode == SWITCH_MODE_TOGGLE) ? arraySize(labels_tgl) : arraySize(labels_mom);
         int backIndex = numItems - 3;
         int saveIndex = numItems - 2;
         int exitIndex = numItems - 1;
@@ -683,6 +690,7 @@ void loop() {
             editingValue = false;
             drawSwitchSelectMenu();
         } else if (switchMenuIndex == saveIndex) { // SAVE
+            saveStatus = true;
             saveSettings();
             drawSwitchMenu();
         } else if (switchMenuIndex == exitIndex) { // EXIT
@@ -731,6 +739,7 @@ void loop() {
           editingValue = false;
           drawEncoderSelectMenu();
         } else if (encoderMenuItemIndex == numItems - 2) { // Save
+          saveStatus = true;
           saveSettings();
           drawEncoderEditMenu();
         } else if (encoderMenuItemIndex == numItems - 1) { // Exit
@@ -834,6 +843,7 @@ void loop() {
           wifiScanIndex = 0;
           drawWifiScan();
         } else if (wifiMenuIndex == 5) { // Save
+          saveStatus = true;
           saveSettings();
           if (wifiEnabled) {
             WiFi.disconnect(true);
@@ -844,6 +854,7 @@ void loop() {
         } else if (wifiMenuIndex == 6) { // Forget
           wifiSsid[0] = '\0';
           wifiPass[0] = '\0';
+          saveStatus = true;
           saveSettings();
           if (wifiEnabled) {
             WiFi.disconnect(true);
@@ -1098,7 +1109,7 @@ void loop() {
       int dir = (v > lastEncSwitch) ? 1 : -1;
       lastEncSwitch = v;
       SwitchConfig &cfg = switchConfigs[switchEditIndex];
-      int numItems = (cfg.mode == SWITCH_MODE_TOGGLE) ? 8 : 7;
+      int numItems = (cfg.mode == SWITCH_MODE_TOGGLE) ? arraySize(labels_tgl) : arraySize(labels_mom);
 
       if (!editingValue) {
         switchMenuIndex += dir;
@@ -1121,7 +1132,8 @@ void loop() {
             if      (switchMenuIndex == 1) { cfg.cc = wrapValue(cfg.cc, dir, SWITCH_CC_MIN, SWITCH_CC_MAX); }
             else if (switchMenuIndex == 2) { cfg.val = wrapValue(cfg.val, dir, SWITCH_VAL_MIN, SWITCH_VAL_MAX); }
             else if (switchMenuIndex == 3) { cfg.altVal = wrapValue(cfg.altVal, dir, SWITCH_VAL_MIN, SWITCH_VAL_MAX); }
-            else if (switchMenuIndex == 4) { cfg.ch = wrapValue(cfg.ch, dir, SWITCH_CH_MIN, SWITCH_CH_MAX); }
+            else if (switchMenuIndex == 4) { cfg.latchEnabled = !cfg.latchEnabled; }
+            else if (switchMenuIndex == 5) { cfg.ch = wrapValue(cfg.ch, dir, SWITCH_CH_MIN, SWITCH_CH_MAX); }
         }
       }
       drawSwitchMenu();
@@ -1434,14 +1446,14 @@ void drawMainMenu(){
 
 void drawSwitchSelectMenu() {
   const char* items[] = {
-    "Switch 1", "Switch 2", "Switch 3 (UI)", "Switch 4", "Switch 5", "Back"
+    "Switch 1", "Switch 2", "Switch 3 (Menu)", "Switch 4", "Switch 5", "Back"
   };
   drawMenuList("Select Switch", items, 6, switchSelectMenuIndex, switchSelectMenuTop);
 }
 
 void drawEncoderSelectMenu() {
   const char* items[] = {
-    "Encoder 1", "Encoder 2", "Encoder 3 (UI)", "Encoder 4", "Encoder 5", "Back"
+    "Encoder 1", "Encoder 2", "Encoder 3 (Menu)", "Encoder 4", "Encoder 5", "Back"
   };
   drawMenuList("Select Encoder", items, 6, encoderSelectMenuIndex, encoderSelectMenuTop);
 }
@@ -1453,7 +1465,7 @@ void drawEncoderEditMenu() {
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(2, 10);
-  const char* encoderNames[] = {"Encoder 3 (UI)", "Encoder 1", "Encoder 2", "Encoder 4", "Encoder 5"};
+  const char* encoderNames[] = {"Encoder 3 (Menu)", "Encoder 1", "Encoder 2", "Encoder 4", "Encoder 5"};
   display.print(encoderNames[encoderEditIndex]);
   display.print(" Config");
 
@@ -1749,10 +1761,10 @@ void drawSwitchMenu(){
 
   SwitchConfig &cfg = switchConfigs[switchEditIndex];
 
-  const char* labels_mom[] = {"Mode", "CC", "Value", "Channel", "Back", "Save", "Exit"};
-  const char* labels_tgl[] = {"Mode", "CC", "Value", "Alt Value", "Channel", "Back", "Save", "Exit"};
+  //const char* labels_mom[] = {"Mode", "CC", "Value", "Channel", "Back", "Save", "Exit"};
+  //const char* labels_tgl[] = {"Mode", "CC", "Value", "Alt Value", "Latch", "Channel", "Back", "Save", "Exit"};
   const char** labels = (cfg.mode == SWITCH_MODE_TOGGLE) ? labels_tgl : labels_mom;
-  int numItems = (cfg.mode == SWITCH_MODE_TOGGLE) ? 8 : 7;
+  int numItems = (cfg.mode == SWITCH_MODE_TOGGLE) ? arraySize(labels_tgl) : arraySize(labels_mom);
 
   const int visibleItems = 4;
   const int itemHeight = 11;
@@ -1796,7 +1808,8 @@ void drawSwitchMenu(){
             if      (itemIndex == 1) display.print(cfg.cc);
             else if (itemIndex == 2) display.print(cfg.val);
             else if (itemIndex == 3) display.print(cfg.altVal);
-            else if (itemIndex == 4) display.print(cfg.ch);
+            else if (itemIndex == 4) display.print(cfg.latchEnabled ? "ON" : "OFF");
+            else if (itemIndex == 5) display.print(cfg.ch);
         }
     }
   }
@@ -2028,6 +2041,7 @@ void loadSettings(){
       switchConfigs[i].val = map_obj["val"] | switchConfigs[i].val;
       switchConfigs[i].ch  = map_obj["ch"]  | switchConfigs[i].ch;
       switchConfigs[i].altVal = map_obj["altVal"] | 0;
+      switchConfigs[i].latchEnabled = map_obj["latchEnabled"] | false;
       i++;
     }
   }
@@ -2077,6 +2091,7 @@ void saveSettings(){
     map_obj["val"] = switchConfigs[i].val;
     map_obj["ch"]  = switchConfigs[i].ch;
     map_obj["altVal"] = switchConfigs[i].altVal;
+    map_obj["latchEnabled"] = switchConfigs[i].latchEnabled;
   }
   JsonArray encoders = doc["encoders"].to<JsonArray>();
   for (int i=0; i<5; i++) {
@@ -2113,7 +2128,8 @@ void saveSettings(){
   }
   f.close();
 
-  if(editingValue){// Show a "Saved!" message on the display for 1 second,only if we were editing a value (not when saving from the menu)
+  if(saveStatus){// Show a "Saved!" message on the display for 1 second,only if we were editing a value (not when saving from the menu)
+    saveStatus = false;
     display.fillRect(10, 22, SCREEN_WIDTH-20, 20, BLACK);
     display.drawRect(10, 22, SCREEN_WIDTH-20, 20, WHITE);
     display.setTextColor(WHITE);
@@ -2142,11 +2158,18 @@ void sendCC(byte cc, byte val, byte ch) {
 void sendCCForIndex(int idx){
   SwitchConfig &cfg = switchConfigs[idx];
   if (cfg.mode == SWITCH_MODE_TOGGLE) {
-    cfg.state = !cfg.state;
     int valueToSend = cfg.state ? cfg.val : cfg.altVal;
+    cfg.state = !cfg.state;
     sendCC((byte)cfg.cc, (byte)valueToSend, (byte)cfg.ch);
   } else { // Momentary
     sendCC((byte)cfg.cc, (byte)cfg.val, (byte)cfg.ch);
+  }
+  // If latching is disabled, ensure all other toggles are off
+  for (int i = 0; i < 5; i++) {
+    if (i != idx && switchConfigs[i].mode == SWITCH_MODE_TOGGLE && switchConfigs[i].latchEnabled == false ) {
+      switchConfigs[i].state = true;
+      //sendCC((byte)switchConfigs[i].cc, (byte)switchConfigs[i].altVal, (byte)switchConfigs[i].ch);
+    }
   }
 }
 

@@ -55,7 +55,11 @@
                     <label>Channel:</label><input type="number" id="switchChannel">
                 </div>
                 <div id="switchSettingMomentary"><label>Value:</label><input type="number" id="switchValue"></div>
-                <div id="switchSettingToggle"><label>On Value:</label><input type="number" id="switchValueToggleOn"><label>Off Value:</label><input type="number" id="switchAltValue"></div>
+                <div id="switchSettingToggle">
+                    <label>On Value:</label><input type="number" id="switchValueToggleOn">
+                    <label>Off Value:</label><input type="number" id="switchAltValue">
+                    <label><input type="checkbox" id="switchLatchEnabled"> Latch Enabled</label>
+                </div>
                 <button onclick="saveSwitchSettings()">Save Switch</button>
             </div>
 
@@ -171,6 +175,7 @@
                 } else {
                     document.getElementById('switchValueToggleOn').value = setting.val;
                     document.getElementById('switchAltValue').value = setting.altVal;
+                    document.getElementById('switchLatchEnabled').checked = setting.latchEnabled;
                 }
                 document.getElementById('switchChannel').value = setting.ch;
                 updateSwitchVisibility();
@@ -299,6 +304,7 @@
             } else if (mode === 'toggle') {
                 setting.val = parseInt(document.getElementById('switchValueToggleOn').value) || 0;
                 setting.altVal = parseInt(document.getElementById('switchAltValue').value) || 0;
+                setting.latchEnabled = document.getElementById('switchLatchEnabled').checked;
             }
             document.getElementById('switchSelect').dataset.lastIndex = document.getElementById('switchSelect').value;
         }

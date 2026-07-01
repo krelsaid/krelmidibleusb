@@ -77,6 +77,7 @@ void handleSettings() {
         obj["val"] = switchConfigs[i].val;
         obj["ch"] = switchConfigs[i].ch;
         obj["altVal"] = switchConfigs[i].altVal;
+        obj["latchEnabled"] = switchConfigs[i].latchEnabled;
     }
 
     JsonArray encSettings = doc["encoderSettings"].to<JsonArray>();
@@ -129,6 +130,7 @@ void handleUpdateSettings() {
                 switchConfigs[i].val = obj["val"] | switchConfigs[i].val;
                 switchConfigs[i].ch = obj["ch"] | switchConfigs[i].ch;
                 switchConfigs[i].altVal = obj["altVal"] | switchConfigs[i].altVal;
+                switchConfigs[i].latchEnabled = obj["latchEnabled"] | switchConfigs[i].latchEnabled;
             }
         }
 
@@ -177,6 +179,7 @@ void handleUpdateSwitch() {
             switchConfigs[index].val = obj["val"] | switchConfigs[index].val;
             switchConfigs[index].ch = obj["ch"] | switchConfigs[index].ch;
             switchConfigs[index].altVal = obj["altVal"] | switchConfigs[index].altVal;
+            switchConfigs[index].latchEnabled = obj["latchEnabled"] | switchConfigs[index].latchEnabled;
             saveSettings();
             server.send(200, "text/plain", "Switch saved");
             return;
