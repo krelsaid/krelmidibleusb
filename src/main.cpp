@@ -136,8 +136,9 @@ const int BATTERY_SMOOTHING_SAMPLES = 20; // Number of samples to average for a 
 float batteryReadings[BATTERY_SMOOTHING_SAMPLES];
 int batteryReadingIndex = 0;
 bool batteryBufferFilled = false;
-
+bool ap_mode = false; // Track if the device is in Access Point mode
 bool usbMidiConnected = false;
+const char* apPassword = "12345678";
 Esp32UsbHost usbHost;
 
 void onUsbMidiConnected() {
@@ -487,16 +488,18 @@ void setup() {
   }
     
   if (wifiEnabled) {
-    WiFi.mode(WIFI_AP_STA); // Enable both AP and STA modes
-    WiFi.setHostname(BLE_NAME);
     // Check if a saved SSID exists, otherwise create an AP
     if (strlen(wifiSsid) > 0) {
+      WiFi.mode(WIFI_STA); // Enable both AP and STA modes
+      WiFi.setHostname(BLE_NAME);
       WiFi.begin(wifiSsid, wifiPass);
     } else {
+      WiFi.mode(WIFI_AP); // No saved WiFi, create an Access Point for configuration
       // No saved WiFi, create an Access Point for configuration
-      WiFi.softAP(BLE_NAME, "12345678"); // SSID, password
+      WiFi.softAP(BLE_NAME, apPassword); // SSID, password
       Serial.print("AP IP address: ");
       Serial.println(WiFi.softAPIP());
+      ap_mode = true; // Set AP mode flag
     }
   }
 
@@ -565,6 +568,7 @@ void loop() {
   } else {
     otaRunning = false; // handles case where wifi is manually disabled
     serverRunning = false;
+    ap_mode = false; // Reset AP mode flag if WiFi is disabled
   }
 
   // Handle web server client requests
@@ -1683,8 +1687,16 @@ void drawWifiInfo(){
       display.println("Connection Lost");
     } else if (s == WL_DISCONNECTED) {
       display.println("Disconnected");
-    } else { // IDLE
+    } else if (s == WL_IDLE_STATUS) { // IDLE
       display.println("Connecting...");
+    } else if ( ap_mode ) { // AP mode
+      display.println("AP Mode");
+      display.print("IP: ");
+      display.println(WiFi.softAPIP());
+      display.print("SSID: ");
+      display.println(BLE_NAME);
+      display.print("Pass: ");
+      display.println(apPassword);
     }
   } else {
     display.println("Disabled");
