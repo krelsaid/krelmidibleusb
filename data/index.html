@@ -1,162 +1,731 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>KHAIRIL MIDI Controller</title>
+    <title>KHAIRIL MIDI Controller - Pocket Edit</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background-color: #f4f6f7; }
-        .nav { background: #34495e; color: #fff; padding: 10px; display: flex; gap: 10px; }
-        .nav button { background: none; border: none; color: #bdc3c7; padding: 10px; cursor: pointer; }
-        .nav button.active { color: #fff; border-bottom: 2px solid #3498db; }
-        .tab-content { display: none; padding: 20px; }
+        :root {
+            --bg-darkest: #131313;
+            --bg-sidebar: #1e1e1e;
+            --bg-main: #262626;
+            --bg-card: #2f2f2f;
+            --bg-input: #171717;
+            --accent-blue: #3498db;
+            --accent-blue-hover: #2980b9;
+            --text-main: #e5e5e5;
+            --text-dim: #8e8e8e;
+            --border-color: #3a3a3a;
+			--accent-orange: #ff8113;
+        }
+
+        body { 
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; 
+            margin: 0; 
+            background-color: var(--bg-main); 
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- SIDEBAR NAVIGATION --- */
+        .sidebar {
+            width: 240px;
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .brand-logo {
+            background: var(--accent-orange);
+            color: #fff;
+            font-weight: 800;
+            padding: 18px;
+            text-transform: uppercase;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+
+        .sidebar-section-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-dim);
+            padding: 20px 20px 5px 20px;
+            font-weight: bold;
+        }
+
+        .nav-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 0 10px;
+        }
+
+        .nav-item {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            padding: 12px 14px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.15s ease;
+        }
+        .nav-item:hover {
+            color: var(--text-main);
+            background-color: rgba(255,255,255,0.03);
+        }
+        .nav-item.active {
+            color: #fff;
+            background-color: var(--accent-blue);
+            font-weight: 700;
+        }
+
+        .sidebar-footer {
+            padding: 15px;
+            margin-top: auto;
+            border-top: 1px solid var(--border-color);
+            background-color: rgba(0,0,0,0.1);
+        }
+        .btn-save-all {
+            width: 100%;
+            background-color: var(--accent-blue);
+            color: #fff;
+            border: 1px solid var(--accent-blue);
+            padding: 12px;
+            border-radius: 4px;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            transition: background 0.2s;
+        }
+        .btn-save-all:hover {
+            background-color: var(--accent-blue-hover);
+        }
+
+        /* --- WORKSPACE LAYOUT --- */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            background-color: var(--bg-main);
+        }
+
+        .top-bar {
+            height: 55px;
+            background-color: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            flex-shrink: 0;
+        }
+        .profile-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .workspace {
+            padding: 30px;
+            max-width: 1150px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-radius: 8px; }
-        .section { margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 5px; background-color: #f9f9f9; }
-        h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: #34495e; }
-        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #bdc3c7; border-radius: 4px; box-sizing: border-box; }
-        button { background-color: #3498db; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; transition: background 0.3s; }
-        button:hover { background-color: #2980b9; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
-        .modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; border-radius: 8px; }
-        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+
+        /* --- UNIFIED HARDWARE MODULE DISPLAY --- */
+        .device-chain {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background-color: var(--bg-sidebar);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 25px;
+            overflow-x: auto;
+        }
+        
+        .chain-module {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+            color: var(--text-dim);
+            transition: color 0.2s, transform 0.15s;
+        }
+        .chain-module:hover {
+            color: var(--text-main);
+        }
+        .chain-module.active {
+            color: var(--accent-orange);
+        }
+        
+        .module-icon {
+            background-color: var(--bg-main);
+            border-radius: 10px;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            border: 1px solid transparent;
+        }
+        .chain-module.active .module-icon {
+            background-color: rgba(52, 152, 219, 0.04);
+            box-shadow: 0 0 12px rgba(52, 152, 219, 0.2);
+            border-color: rgba(52, 152, 219, 0.25);
+        }
+
+        .module-status {
+            width: 6px;
+            height: 6px;
+            background-color: #2ecc71;
+            border-radius: 50%;
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            box-shadow: 0 0 5px #2ecc71;
+        }
+        .module-name {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 8px;
+            letter-spacing: 0.5px;
+        }
+        .module-type {
+            font-size: 9px;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        .chain-arrow {
+            color: var(--border-color);
+            font-size: 16px;
+            font-weight: bold;
+            user-select: none;
+            padding-bottom: 26px;
+        }
+
+        /* --- PARAMETER INTERFACE DESIGN --- */
+        .editor-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .parameter-split-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .parameter-column {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            box-sizing: border-box;
+            min-height: 240px;
+        }
+        
+        h2 { font-size: 16px; margin-top: 0; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        h3 { font-size: 12px; color: var(--accent-blue); margin-top: 0; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 6px; }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: bold;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+        }
+        input[type="text"], input[type="number"], input[type="password"], select {
+            width: 100%;
+            padding: 11px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--bg-input);
+            color: var(--text-main);
+            box-sizing: border-box;
+            font-size: 12px;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .btn-action {
+            align-self: flex-start;
+            background-color: var(--bg-card);
+            color: var(--text-main);
+            padding: 11px 22px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            transition: all 0.15s;
+        }
+        .btn-action:hover {
+            background-color: var(--accent-blue);
+            color: #fff;
+            border-color: var(--accent-blue);
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            margin-top: auto;
+        }
+        .toggle-container input { display: none; }
+        .toggle-switch {
+            width: 38px;
+            height: 18px;
+            background-color: #444;
+            border-radius: 9px;
+            position: relative;
+            transition: background-color 0.2s;
+        }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: #fff;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s;
+        }
+        .toggle-container input:checked + .toggle-switch {
+            background-color: var(--accent-orange);
+        }
+        .toggle-container input:checked + .toggle-switch::after {
+            transform: translateX(20px);
+        }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th { background-color: var(--bg-input); color: var(--text-dim); font-size: 10px; text-transform: uppercase; padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); }
+        td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 12px; }
+
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(2px); }
+        .modal-content { background-color: var(--bg-sidebar); margin: 12% auto; padding: 25px; border: 1px solid var(--border-color); width: 40%; border-radius: 6px; }
+        .close { color: var(--text-dim); float: right; font-size: 20px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: var(--accent-blue); }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
     </style>
 </head>
 <body>
-    <div class="nav">
-        <button class="active" onclick="showTab('control')">Control</button>
-        <button onclick="showTab('system')">System</button>
-        <button onclick="showTab('files')">Filesystem</button>
-        <button onclick="openModal('aboutModal')">About</button>
+
+    <div class="sidebar">
+        <div class="brand-logo">Midi Switch Edit</div>
+        
+        <div class="sidebar-section-title">Navigation Tabs</div>
+        <div class="nav-group">
+            <button class="nav-item active" id="btn-tab-ctrl-switch" onclick="selectUtilityTab('ctrl-switch')">
+                Switch Settings
+            </button>
+            <button class="nav-item" id="btn-tab-ctrl-encoder" onclick="selectUtilityTab('ctrl-encoder')">
+                Encoder Settings
+            </button>
+            <button class="nav-item" id="btn-tab-wifi" onclick="selectUtilityTab('wifi')">
+                WiFi Settings
+            </button>
+            <button class="nav-item" id="btn-tab-files" onclick="selectUtilityTab('files')">
+                Filesystem
+            </button>
+            <button class="nav-item" onclick="openModal('aboutModal')">
+                Info
+            </button>
+        </div>
+
+        <div class="sidebar-footer">
+            <button class="btn-save-all" onclick="saveAllSettings()">Save All Changes</button>
+        </div>
     </div>
 
-    <div class="container">
-        <div id="control" class="tab-content active">
-            <h2>Control Settings</h2>
-            <div class="section">
-                <h3>Switch Settings</h3>
-                <p><small>Only the fields relevant to the selected mode will be saved.</small></p>
-                <select id="switchSelect" onchange="switchChanged()">
-                    <option value="0">Switch 1</option>
-                    <option value="1">Switch 2</option>
-                    <option value="4">Switch 3 (Menu)</option>
-                    <option value="2">Switch 4</option>
-                    <option value="3">Switch 5</option>
-                </select>
-                <label for="switchMode">Mode:</label>
-                <select id="switchMode" onchange="updateSwitchVisibility()">
-                    <option value="momentary">Momentary</option>
-                    <option value="toggle">Toggle</option>
-                </select>
-                <div id="switchSettingCommon">
-                    <label>CC Number:</label><input type="number" id="switchCc">
-                    <label>Channel:</label><input type="number" id="switchChannel">
-                </div>
-                <div id="switchSettingMomentary"><label>Value:</label><input type="number" id="switchValue"></div>
-                <div id="switchSettingToggle">
-                    <label>On Value:</label><input type="number" id="switchValueToggleOn">
-                    <label>Off Value:</label><input type="number" id="switchAltValue">
-                    <label><input type="checkbox" id="switchLatchEnabled"> Latch Enabled</label>
-                </div>
-                <button onclick="saveSwitchSettings()">Save Switch</button>
-            </div>
-
-            <div class="section">
-                <h3>Encoder Settings</h3>
-                <select id="encoderSelect" onchange="encoderChanged()">
-                    <option value="1">Encoder 1</option>
-                    <option value="2">Encoder 2</option>
-                    <option value="0">Encoder 3 (Menu)</option>
-                    <option value="3">Encoder 4</option>
-                    <option value="4">Encoder 5</option>
-                </select>
-                <label for="encoderMode">Mode:</label>
-                <select id="encoderMode" onchange="updateEncoderVisibility()">
-                    <option value="single">Single CC</option>
-                    <option value="range">Range CC</option>
-                </select>
-                <div id="encoderSingleSettings">
-                    <h3>Left Action</h3>
-                    <label>CC:</label><input type="number" id="encoderLeftCc">
-                    <label>Value:</label><input type="number" id="encoderLeftVal">
-                    <label>Ch:</label><input type="number" id="encoderLeftCh">
-                    <h3>Right Action</h3>
-                    <label>CC:</label><input type="number" id="encoderRightCc">
-                    <label>Value:</label><input type="number" id="encoderRightVal">
-                    <label>Ch:</label><input type="number" id="encoderRightCh">
-                </div>
-                <div id="encoderRangeSettings">
-                    <h3>Range Mode</h3>
-                    <label>Min:</label><input type="number" id="encoderRangeMin">
-                    <label>Max:</label><input type="number" id="encoderRangeMax">
-                    <label>Current:</label><input type="number" id="encoderCurrentValue" readonly>
-                </div>
-                <h3>General</h3>
-                <label>Steps:</label><input type="number" id="encoderSingleModeSteps">
-                <label>Accel:</label><input type="number" id="encoderAcceleration">
-                <button onclick="saveEncoderSettings()">Save Encoder</button>
-            </div>
+    <div class="main-content">
+        <div class="top-bar">
+            <div class="profile-title" id="activeContextTitle">Switch 1 Configuration</div>
+            <div style="font-size: 11px; color: var(--text-dim);" id="fwversion">version</div>
         </div>
 
-        <div id="system" class="tab-content">
-            <h2>System & WiFi</h2>
-            <div class="section">
-                <h3>WiFi Settings</h3>
-                <label>Enable:<input type="checkbox" id="wifiEnable"></label>
-                <label>SSID:</label><input type="text" id="ssid">
-                <label>Pass:</label><input type="password" id="password">
-                <button onclick="connectWifi()">Connect</button>
-            </div>
-            <button onclick="saveAllSettings()">Save All Changes</button>
-        </div>
+        <div class="workspace">
+            
+            <div id="ctrl-switch" class="tab-content active">
+                <h2>Hardware Switch Workspace</h2>
+                
+                <div class="device-chain">
+                    <div class="chain-module active" id="node-sw-0" onclick="selectHardwareComponent('switch', 0)">
+                        <svg class="module-icon" width="100" height="130" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="2" width="96" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                            <rect x="30" y="35" width="40" height="40" rx="6" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="50" cy="55" r="10" fill="currentColor"/>
+                        </svg>
+                        <div class="module-status"></div>
+                        <div class="module-name">SW 1</div>
+                        <div class="module-type">Switch 1</div>
+                    </div>
+                    <div class="chain-arrow">➔</div>
+                    <div class="chain-module" id="node-sw-1" onclick="selectHardwareComponent('switch', 1)">
+                        <svg class="module-icon" width="100" height="130" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="2" width="96" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                            <rect x="30" y="35" width="40" height="40" rx="6" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="50" cy="55" r="10" fill="currentColor"/>
+                        </svg>
+                        <div class="module-status"></div>
+                        <div class="module-name">SW 2</div>
+                        <div class="module-type">Switch 2</div>
+                    </div>
+                    <div class="chain-arrow">➔</div>
+                    <div class="chain-module" id="node-sw-4" onclick="selectHardwareComponent('switch', 4)">
+                        <svg class="module-icon" width="100" height="130" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="2" width="96" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                            <rect x="30" y="35" width="40" height="40" rx="20" stroke="currentColor" stroke-width="2"/>
+                            <path d="M42 55h16M50 47v16" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <div class="module-status"></div>
+                        <div class="module-name">SW 3</div>
+                        <div class="module-type">Menu Switch</div>
+                    </div>
+                    <div class="chain-arrow">➔</div>
+                    <div class="chain-module" id="node-sw-2" onclick="selectHardwareComponent('switch', 2)">
+                        <svg class="module-icon" width="100" height="130" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="2" width="96" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                            <rect x="30" y="35" width="40" height="40" rx="6" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="50" cy="55" r="10" fill="currentColor"/>
+                        </svg>
+                        <div class="module-status"></div>
+                        <div class="module-name">SW 4</div>
+                        <div class="module-type">Switch 4</div>
+                    </div>
+                    <div class="chain-arrow">➔</div>
+                    <div class="chain-module" id="node-sw-3" onclick="selectHardwareComponent('switch', 3)">
+                        <svg class="module-icon" width="100" height="130" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="2" width="96" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                            <rect x="30" y="35" width="40" height="40" rx="6" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="50" cy="55" r="10" fill="currentColor"/>
+                        </svg>
+                        <div class="module-status"></div>
+                        <div class="module-name">SW 5</div>
+                        <div class="module-type">Switch 5</div>
+                    </div>
+                </div>
 
-        <div id="files" class="tab-content">
-            <h2>File Explorer</h2>
-            <table>
-                <thead><tr><th>File</th><th>Size</th><th>Actions</th></tr></thead>
-                <tbody id="fileList"></tbody>
-            </table>
-            <h3>Upload File</h3>
-            <input type="file" id="fileInput">
-            <button onclick="uploadFile()">Upload Selected</button>
-            <p id="uploadStatus"></p>
+                <div class="editor-panel">
+                    <div class="parameter-split-layout">
+                        <div class="parameter-column">
+                            <h3>Switch Configuration</h3>
+                            <select id="switchSelect" onchange="switchChanged()" style="display: none;">
+                                <option value="0">Switch 1</option>
+                                <option value="1">Switch 2</option>
+                                <option value="4">Switch 3 (Menu)</option>
+                                <option value="2">Switch 4</option>
+                                <option value="3">Switch 5</option>
+                            </select>
+
+                            <label for="switchMode">Action Mode</label>
+                            <select id="switchMode" onchange="updateSwitchVisibility()">
+                                <option value="momentary">Momentary</option>
+                                <option value="toggle">Toggle</option>
+                            </select>
+
+                            <div id="switchSettingCommon" class="grid-2">
+                                <div><label>CC Number</label><input type="number" id="switchCc"></div>
+                                <div><label>Channel</label><input type="number" id="switchChannel"></div>
+                            </div>
+                        </div>
+
+                        <div class="parameter-column">
+                            <h3> </h3>
+                            <div id="switchSettingMomentary">
+                                <label>Value</label><input type="number" id="switchValue">
+                            </div>
+
+                            <div id="switchSettingToggle" style="width: 100%;">
+                                <div class="grid-2">
+                                    <div><label>On Value</label><input type="number" id="switchValueToggleOn"></div>
+                                    <div><label>Off Value</label><input type="number" id="switchAltValue"></div>
+                                </div>
+                                <label class="toggle-container">
+                                    <input type="checkbox" id="switchLatchEnabled">
+                                    <div class="toggle-switch"></div>
+                                    <span style="font-size: 11px; font-weight: bold; color: var(--text-dim)">LATCH HARDWARE MODE</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-action" onclick="saveSwitchSettings()">Save Switch Configuration</button>
+					<p id="switchSaveStatus" style="font-size:12px; color:var(--accent-blue); margin-top:10px;"></p>
+                </div>
+            </div>
+
+            <div id="ctrl-encoder" class="tab-content">
+                <h2>Rotary Encoder Workspace</h2>
+                
+                <div class="device-chain">
+                    <div class="chain-module" id="node-enc-1" onclick="selectHardwareComponent('encoder', 1)">
+                        <svg class="module-icon" width="100" height="130" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="2" width="96" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                            <circle cx="50" cy="55" r="22" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="50" cy="55" r="14" stroke="currentColor" stroke-width="1"/>
+                            <line x1="50" y1="33" x2="50" y2="43" stroke="currentColor" stroke-width="3"/>
+                        </svg>
+                        <div class="module-status"></div>
+                        <div class="module-name">ENC 1</div>
+                        <div class="module-type">Encoder 1</div>
+                    </div>
+                    <div class="chain-arrow">➔</div>
+                    <div class="chain-module" id="node-enc-2" onclick="selectHardwareComponent('encoder', 2)">
+                        <svg class="module-icon" width="100" height="130" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="2" width="96" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                            <circle cx="50" cy="55" r="22" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="50" cy="55" r="14" stroke="currentColor" stroke-width="1"/>
+                            <line x1="50" y1="33" x2="50" y2="43" stroke="currentColor" stroke-width="3"/>
+                        </svg>
+                        <div class="module-status"></div>
+                        <div class="module-name">ENC 2</div>
+                        <div class="module-type">Encoder 2</div>
+                    </div>
+                    <div class="chain-arrow">➔</div>
+                    <div class="chain-module" id="node-enc-0" onclick="selectHardwareComponent('encoder', 0)">
+                        <svg class="module-icon" width="100" height="130" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="2" width="96" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                            <circle cx="50" cy="55" r="22" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2"/>
+                            <path d="M42 55h16M50 47v16" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <div class="module-status"></div>
+                        <div class="module-name">ENC 3</div>
+                        <div class="module-type">Menu Encoder</div>
+                    </div>
+                    <div class="chain-arrow">➔</div>
+                    <div class="chain-module" id="node-enc-3" onclick="selectHardwareComponent('encoder', 3)">
+                        <svg class="module-icon" width="100" height="130" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="2" width="96" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                            <circle cx="50" cy="55" r="22" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="50" cy="55" r="14" stroke="currentColor" stroke-width="1"/>
+                            <line x1="50" y1="33" x2="50" y2="43" stroke="currentColor" stroke-width="3"/>
+                        </svg>
+                        <div class="module-status"></div>
+                        <div class="module-name">ENC 4</div>
+                        <div class="module-type">Encoder 4</div>
+                    </div>
+                    <div class="chain-arrow">➔</div>
+                    <div class="chain-module" id="node-enc-4" onclick="selectHardwareComponent('encoder', 4)">
+                        <svg class="module-icon" width="100" height="130" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="2" width="96" height="126" rx="10" stroke="currentColor" stroke-width="3"/>
+                            <circle cx="50" cy="55" r="22" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="50" cy="55" r="14" stroke="currentColor" stroke-width="1"/>
+                            <line x1="50" y1="33" x2="50" y2="43" stroke="currentColor" stroke-width="3"/>
+                        </svg>
+                        <div class="module-status"></div>
+                        <div class="module-name">ENC 5</div>
+                        <div class="module-type">Encoder 5</div>
+                    </div>
+                </div>
+
+                <div class="editor-panel">
+                    <div class="parameter-split-layout">
+                        <div class="parameter-column">
+                            <h3>Encoder Configuration</h3>
+                            <select id="encoderSelect" onchange="encoderChanged()" style="display: none;">
+                                <option value="1">Encoder 1</option>
+                                <option value="2">Encoder 2</option>
+                                <option value="0">Encoder 3 (Menu)</option>
+                                <option value="3">Encoder 4</option>
+                                <option value="4">Encoder 5</option>
+                            </select>
+
+                            <label for="encoderMode">Operation Mode</label>
+                            <select id="encoderMode" onchange="updateEncoderVisibility()">
+                                <option value="single">Single CC</option>
+                                <option value="range">Range CC</option>
+                            </select>
+
+                            <div id="encoderSingleSettings">
+                                <h4 style="font-size:11px; margin:0 0 12px 0; color:var(--text-dim); text-transform:uppercase;">Left Turn Trigger</h4>
+
+                            </div>
+							    <div class="grid-3">
+                                    <div><label>CC</label><input type="number" id="encoderLeftCc"></div>
+									<div id="encoderSingleSettingsAlt2">
+                                    <div><label>Value</label><input type="number" id="encoderLeftVal"></div>
+									</div>
+                                    <div><label>Ch</label><input type="number" id="encoderLeftCh"></div>
+                                </div>
+
+                            <div id="encoderRangeSettings">
+
+                            </div>
+		
+                        </div>
+
+                        <div class="parameter-column">
+                            <h3> </h3>
+                            <div id="encoderSingleSettingsAlt">
+                                <h4 style="font-size:11px; margin:0 0 12px 0; color:var(--text-dim); text-transform:uppercase;">Right Turn Trigger</h4>
+                                <div class="grid-3">
+                                    <div><label>CC</label><input type="number" id="encoderRightCc"></div>
+                                    <div><label>Value</label><input type="number" id="encoderRightVal"></div>
+                                    <div><label>Ch</label><input type="number" id="encoderRightCh"></div>
+                                </div>
+                            </div>
+
+                            <div id="encoderRangeSettingsAlt">
+                                 <div><label>Min</label><input type="number" id="encoderRangeMin"></div>
+                                 <div><label>Max</label><input type="number" id="encoderRangeMax"></div>
+                            </div>
+
+                            <div class="grid-2" style="margin-top: auto;">
+                                <div><label>Steps Multiplier</label><input type="number" id="encoderSingleModeSteps"></div>
+                                <div><label>Acceleration Gain</label><input type="number" id="encoderAcceleration"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-action" onclick="saveEncoderSettings()">Save Encoder Configuration</button>
+					<p id="encoderSaveStatus" style="font-size:12px; color:var(--accent-blue); margin-top:10px;"></p>
+                </div>
+            </div>
+
+            <div id="wifi" class="tab-content">
+                <h2>Wifi Control Panel</h2>
+                <div class="editor-panel">
+                    <div class="parameter-column" style="max-width: 600px;">
+                        <h3>WiFi Configuration</h3>
+                        <label class="toggle-container" style="margin-bottom: 20px;">
+                            <input type="checkbox" id="wifiEnable">
+                            <div class="toggle-switch"></div>
+                            <span style="font-size: 11px; font-weight: bold; color: var(--text-dim)">ENABLE WI-FI</span>
+                        </label>
+                        <label>Network Access Point SSID</label><input type="text" id="ssid">
+                        <label>WPA2 Secure Password Key</label><input type="password" id="password">
+                        <button class="btn-action" onclick="connectWifi()">Connect Wireless</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="files" class="tab-content">
+                <h2>Storage File System</h2>
+                <div class="editor-panel">
+                    <div class="parameter-column">
+                        <table>
+                            <thead><tr><th>File Name</th><th>Size</th><th>Management Actions</th></tr></thead>
+                            <tbody id="fileList"></tbody>
+                        </table>
+                        <h3>File Upload</h3>
+                        <input type="file" id="fileInput" style="color:var(--text-dim); margin-bottom:15px;">
+                        <br>
+                        <button class="btn-action" onclick="uploadFile()">Upload</button>
+                        <p id="uploadStatus" style="font-size:12px; color:var(--accent-blue); margin-top:10px;"></p>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
     <div id="aboutModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('aboutModal')">&times;</span>
-            <h2>System Status</h2>
-            <p>Firmware: <span id="sysFirmware">Loading...</span></p>
-            <p>Battery: <span id="sysBattery">Loading...</span></p>
-            <p>Voltage: <span id="sysBatteryVolt">Loading...</span></p>
-            <p>Uptime: <span id="sysUptime">Loading...</span></p>
+            <h2 style="color:var(--accent-blue)">Info</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top:20px;">
+                <div><label>Core Firmware</label><div id="sysFirmware" style="font-weight:600;">Loading...</div></div>
+                <div><label>Battery Capacity</label><div id="sysBattery" style="font-weight:600; color:#2ecc71;">Loading...</div></div>
+                <div><label>Battery Voltage</label><div id="sysBatteryVolt" style="font-weight:600;">Loading...</div></div>
+                <div><label>Uptime</label><div id="sysUptime" style="font-weight:600;">Loading...</div></div>
+            </div>
         </div>
     </div>
 
     <script>
         let currentSettings = {};
+        let activeSwitchIndex = 0;
+        let activeEncoderIndex = 1;
 
-        function showTab(id) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            event.target.classList.add('active');
-            if(id === 'files') fetchFiles();
+        function selectHardwareComponent(type, index) {
+            document.querySelectorAll('.chain-module').forEach(node => node.classList.remove('active'));
+            const titleEl = document.getElementById('activeContextTitle');
+            
+            if (type === 'switch') {
+                saveCurrentSwitchToLocal();
+                activeSwitchIndex = index;
+                document.getElementById(`node-sw-${index}`).classList.add('active');
+                loadSwitchSettings();
+                
+                let displayName = index === 4 ? "Switch 3 (Menu)" : "Switch " + (parseInt(index) + 1);
+                titleEl.innerText = displayName + " Configuration";
+                const status = document.getElementById('switchSaveStatus');
+                status.innerText = '';
+            } else if (type === 'encoder') {
+                saveCurrentEncoderToLocal();
+                activeEncoderIndex = index;
+                document.getElementById(`node-enc-${index}`).classList.add('active');
+                loadEncoderSettings();
+                
+                let displayName = index === 0 ? "Encoder 3 (Menu)" : "Encoder " + index;
+                titleEl.innerText = displayName + " Configuration";
+                const status = document.getElementById('encoderSaveStatus');
+                status.innerText = '';
+            }
         }
+
+        function selectUtilityTab(tabId) {
+            document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.getElementById(`btn-tab-${tabId}`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+            
+            if (tabId === 'ctrl-switch') {
+                selectHardwareComponent('switch', 0);
+            } else if (tabId === 'ctrl-encoder') {
+                selectHardwareComponent('encoder', 1);
+            } else {
+                document.getElementById('activeContextTitle').innerText = tabId.toUpperCase() + " Workspace Mode";
+                if (tabId === 'files') fetchFiles();
+            }
+        }
+
         function openModal(id) { document.getElementById(id).style.display = 'block'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
         async function fetchSettings() {
-            const response = await fetch('/settings');
-            currentSettings = await response.json();
-            applySettingsToPage();
-            console.log("Settings", currentSettings);
+            try {
+                const response = await fetch('/settings');
+                currentSettings = await response.json();
+                applySettingsToPage();
+            } catch(e) { console.log("Offline Fallback Loaded."); }
         }
 
         function applySettingsToPage() {
+            if(!currentSettings.wifi) return;
             document.getElementById('wifiEnable').checked = currentSettings.wifi.enabled;
             document.getElementById('ssid').value = currentSettings.wifi.ssid;
             document.getElementById('password').value = currentSettings.wifi.password;
@@ -165,7 +734,8 @@
         }
 
         function loadSwitchSettings() {
-            const index = document.getElementById('switchSelect').value;
+            const index = activeSwitchIndex;
+            if(!currentSettings.switchConfigs) return;
             const setting = currentSettings.switchConfigs[index];
             if (setting) {
                 document.getElementById('switchMode').value = setting.mode;
@@ -183,7 +753,8 @@
         }
 
         function loadEncoderSettings() {
-            const index = document.getElementById('encoderSelect').value;
+            const index = activeEncoderIndex;
+            if(!currentSettings.encoderSettings) return;
             const setting = currentSettings.encoderSettings[index];
             if (setting) {
                 document.getElementById('encoderMode').value = setting.mode;
@@ -201,38 +772,81 @@
                 updateEncoderVisibility();
             }
         }
+
+        function switchChanged() {
+            saveCurrentSwitchToLocal();
+            loadSwitchSettings();
+            const status = document.getElementById('switchSaveStatus');
+            status.innerText = '';
+        }
+        function encoderChanged() {
+            saveCurrentEncoderToLocal();
+            loadEncoderSettings();
+            const status = document.getElementById('encoderSaveStatus');
+            status.innerText = '';
+        }
         
         async function saveSwitchSettings() {
             saveCurrentSwitchToLocal();
-            const index = document.getElementById('switchSelect').value;
+            const index = activeSwitchIndex;
             const setting = currentSettings.switchConfigs[index];
+            const status = document.getElementById('switchSaveStatus');
             const payload = { index: parseInt(index), config: setting };
             const response = await fetch('/updateSwitch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            alert(await response.text());
+            //alert(await response.text());
+			if (response.ok) { status.innerText = 'Save successful!'; }
+            else status.innerText = 'Save failed.';
         }
 
         async function saveEncoderSettings() {
             saveCurrentEncoderToLocal();
-            const index = document.getElementById('encoderSelect').value;
+            const index = activeEncoderIndex;
             const setting = currentSettings.encoderSettings[index];
+            const status = document.getElementById('encoderSaveStatus');
             const payload = { index: parseInt(index), config: setting };
             const response = await fetch('/updateEncoder', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            alert(await response.text());
+            //alert(await response.text());
+			if (response.ok) { status.innerText = 'Save successful!'; }
+            else status.innerText = 'Save failed.';
+        }
+
+		async function saveAllSettings() {
+            // Save currently visible fields first
+            saveCurrentSwitchToLocal();
+            saveCurrentEncoderToLocal();
+
+            // Sync WiFi inputs 
+            if (currentSettings.wifi) {
+                currentSettings.wifi.enabled = document.getElementById('wifiEnable').checked;
+                currentSettings.wifi.ssid = document.getElementById('ssid').value;
+                currentSettings.wifi.password = document.getElementById('password').value;
+            }
+
+            try {
+                const response = await fetch('/updateSettings', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentSettings)
+                });
+                alert("Global Config Flash Successful! All 5 Encoders & Switches Committed.");
+            } catch(e) { alert("Core storage write exception occurred."); }
         }
 
         async function fetchFiles() {
-            const resp = await fetch('/listFs');
-            const files = await resp.json();
-            const list = document.getElementById('fileList');
-            list.innerHTML = files.map(f => `<tr><td>${f.name}</td><td>${f.size} bytes</td><td><button onclick="downloadFile('${f.name}')">Download</button> <button onclick="deleteFile('${f.name}')">Delete</button></td></tr>`).join('');
+            try {
+                const resp = await fetch('/listFs');
+                const files = await resp.json();
+                const list = document.getElementById('fileList');
+                list.innerHTML = files.map(f => `<tr><td>${f.name}</td><td>${f.size} bytes</td><td><button class="btn-action" onclick="downloadFile('${f.name}')">Download</button> <button class="btn-action" onclick="deleteFile('${f.name}')" style="border-color:#c0392b; color:#e74c3c;">Delete</button></td></tr>`).join('');
+            } catch(e){}
         }
 
         async function deleteFile(name) {
@@ -242,9 +856,7 @@
             }
         }
 
-        function downloadFile(name) {
-            window.location.href = '/download?name=' + name;
-        }
+        function downloadFile(name) { window.location.href = '/download?name=' + name; }
 
         async function uploadFile() {
             const fileInput = document.getElementById('fileInput');
@@ -266,10 +878,11 @@
                 const response = await fetch('/systemInfo');
                 const info = await response.json();
                 document.getElementById('sysFirmware').innerText = info.firmware || 'N/A';
+				document.getElementById('fwversion').innerText = info.firmware || 'version';
                 document.getElementById('sysBattery').innerText = (info.battery !== undefined) ? `${info.battery}%` : 'N/A';
                 document.getElementById('sysBatteryVolt').innerText = (info.batteryVoltage !== undefined) ? `${info.batteryVoltage} V` : 'N/A';
                 document.getElementById('sysUptime').innerText = info.uptime || 'N/A';
-            } catch (e) { console.error("Failed to fetch system info", e); }
+            } catch (e) { }
         }
 
         function updateSwitchVisibility() {
@@ -279,21 +892,20 @@
         }
         function updateEncoderVisibility() {
             const mode = document.getElementById('encoderMode').value;
-            document.getElementById('encoderSingleSettings').style.display = (mode === 'single') ? 'block' : 'none';
-            document.getElementById('encoderRangeSettings').style.display = (mode === 'range') ? 'block' : 'none';
+            const isSingle = (mode === 'single');
+            
+            document.getElementById('encoderSingleSettings').style.display = isSingle ? 'block' : 'none';
+            document.getElementById('encoderSingleSettingsAlt').style.display = isSingle ? 'block' : 'none';
+            document.getElementById('encoderSingleSettingsAlt2').style.display = isSingle ? 'block' : 'none';
+			
+            document.getElementById('encoderRangeSettings').style.display = !isSingle ? 'block' : 'none';
+            document.getElementById('encoderRangeSettingsAlt').style.display = !isSingle ? 'block' : 'none';
         }
-        function switchChanged() {
-            saveCurrentSwitchToLocal();
-            loadSwitchSettings();
-        }
-        function encoderChanged() {
-            saveCurrentEncoderToLocal();
-            loadEncoderSettings();
-        }
-        function saveCurrentSwitchToLocal(index = null) {
-            const idx = index !== null ? index : (document.getElementById('switchSelect').dataset.lastIndex || 0);
+        
+        function saveCurrentSwitchToLocal() {
+            const idx = activeSwitchIndex;
+            if(!currentSettings.switchConfigs || !currentSettings.switchConfigs[idx]) return;
             const setting = currentSettings.switchConfigs[idx];
-            if (!setting) return;
             const mode = document.getElementById('switchMode').value;
             setting.mode = mode;
             setting.cc = parseInt(document.getElementById('switchCc').value) || 0;
@@ -306,12 +918,11 @@
                 setting.altVal = parseInt(document.getElementById('switchAltValue').value) || 0;
                 setting.latchEnabled = document.getElementById('switchLatchEnabled').checked;
             }
-            document.getElementById('switchSelect').dataset.lastIndex = document.getElementById('switchSelect').value;
         }
-        function saveCurrentEncoderToLocal(index = null) {
-            const idx = index !== null ? index : (document.getElementById('encoderSelect').dataset.lastIndex || 0);
+        function saveCurrentEncoderToLocal() {
+            const idx = activeEncoderIndex;
+            if(!currentSettings.encoderSettings || !currentSettings.encoderSettings[idx]) return;
             const setting = currentSettings.encoderSettings[idx];
-            if (!setting) return;
             const mode = document.getElementById('encoderMode').value;
             setting.mode = mode;
             if (mode === 'single') {
@@ -322,13 +933,14 @@
                 setting.right_val = parseInt(document.getElementById('encoderRightVal').value) || 0;
                 setting.right_ch = parseInt(document.getElementById('encoderRightCh').value) || 1;
             } else if (mode === 'range') {
+			    setting.left_cc = parseInt(document.getElementById('encoderLeftCc').value) || 0;
+                setting.left_val = parseInt(document.getElementById('encoderLeftVal').value) || 0;
+                setting.left_ch = parseInt(document.getElementById('encoderLeftCh').value) || 1;
                 setting.rangeMin = parseInt(document.getElementById('encoderRangeMin').value) || 0;
                 setting.rangeMax = parseInt(document.getElementById('encoderRangeMax').value) || 127;
-                setting.currentValue = parseInt(document.getElementById('encoderCurrentValue').value) || 0;
             }
             setting.singleModeSteps = parseInt(document.getElementById('encoderSingleModeSteps').value) || 1;
             setting.acceleration = parseInt(document.getElementById('encoderAcceleration').value) || 0;
-            document.getElementById('encoderSelect').dataset.lastIndex = document.getElementById('encoderSelect').value;
         }
 
         document.addEventListener('DOMContentLoaded', () => {
